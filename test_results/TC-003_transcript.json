@@ -1,0 +1,64 @@
+{
+  "id": "TC-003",
+  "name": "Happy Path: Free Trial Cancellation (FREE_TRIAL_PLAN)",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "Cancel my subscription please",
+      "bot": "I'm sorry to hear you'd like to cancel your plan. Could you share the reason for your cancellation? Your feedback helps us improve your experience."
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "I don't like the content",
+      "bot": "Thank you for sharing your reason. Before we proceed, I have a special offer available for you: \n\nWould you like me to set that up for you?"
+    },
+    {
+      "type": "bot_message",
+      "turn": 3,
+      "user": "Yes please cancel",
+      "bot": "I understand your request. Instead of cancelling, we recommend trying our Pause feature. This lets you pause your subscription at no cost and reactivate it whenever you choose. It's a great way to keep your account active without losing your current benefits.\n\nWould you like to explore this option?"
+    }
+  ],
+  "tool_calls_made": {},
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "cancellationOptionMessage is shown verbatim (mentions free trial / no charge)",
+        "verdict": "FAIL",
+        "reason": "The transcript does not contain any message mentioning a free trial or no charge."
+      },
+      {
+        "criterion": "No 30-day notice or prorated messaging appears",
+        "verdict": "PASS",
+        "reason": "There is no mention of a 30-day notice or prorated messaging in the transcript."
+      },
+      {
+        "criterion": "cancelProductImmediate (not cancelProduct) is called",
+        "verdict": "FAIL",
+        "reason": "No tool calls are made, including cancelProductImmediate."
+      },
+      {
+        "criterion": "Pause offer is NOT shown before cancellation (FREE_TRIAL_PLAN skips pause step)",
+        "verdict": "FAIL",
+        "reason": "The bot offers the Pause feature before proceeding with cancellation."
+      },
+      {
+        "criterion": "Confirmation is requested before executing cancellation",
+        "verdict": "FAIL",
+        "reason": "The bot does not request explicit confirmation before executing cancellation; instead, it tries to offer the Pause feature again."
+      }
+    ],
+    "overall": "FAIL",
+    "summary": "Most criteria are not met: the required cancellation message is missing, the pause offer is shown before cancellation, no cancellation tool is called, and confirmation is not requested.",
+    "criteria": [
+      "cancellationOptionMessage is shown verbatim (mentions free trial / no charge)",
+      "No 30-day notice or prorated messaging appears",
+      "cancelProductImmediate (not cancelProduct) is called",
+      "Pause offer is NOT shown before cancellation (FREE_TRIAL_PLAN skips pause step)",
+      "Confirmation is requested before executing cancellation"
+    ]
+  },
+  "timestamp": "2026-05-13T18:27:57.686999"
+}

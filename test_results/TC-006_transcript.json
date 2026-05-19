@@ -1,0 +1,52 @@
+{
+  "id": "TC-006",
+  "name": "productStatus = ActiveGrace \u2014 Route to Missed Payment Agent",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "I want to cancel my subscription",
+      "bot": "I'm sorry to hear you'd like to cancel your subscription. Could you share the reason for your cancellation? Your feedback helps us improve your experience."
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "I don't need it anymore",
+      "bot": "Thank you for letting me know. Before we continue, I have a special offer available for you: Would you like me to set that up for you?"
+    }
+  ],
+  "tool_calls_made": {},
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "getProductDetailsForCancel tool is called",
+        "verdict": "FAIL",
+        "reason": "The getProductDetailsForCancel tool is not called in the transcript."
+      },
+      {
+        "criterion": "Bot routes to [Customer missed a payment] agent (routing marker or agent name visible)",
+        "verdict": "FAIL",
+        "reason": "There is no routing to [Customer missed a payment] agent or any routing marker in the transcript."
+      },
+      {
+        "criterion": "Bot does NOT continue with cancellation steps after routing",
+        "verdict": "PASS",
+        "reason": "The bot does not continue with cancellation steps, but this is only because routing did not occur."
+      },
+      {
+        "criterion": "Routing message is the standard escalation message or routing is silent (no detailed explanation of what happened)",
+        "verdict": "PASS",
+        "reason": "No routing message is present, so there is no detailed explanation."
+      }
+    ],
+    "overall": "FAIL",
+    "summary": "The transcript fails to meet the required criteria as the necessary tool call and routing to the specified agent did not occur.",
+    "criteria": [
+      "getProductDetailsForCancel tool is called",
+      "Bot routes to [Customer missed a payment] agent (routing marker or agent name visible)",
+      "Bot does NOT continue with cancellation steps after routing",
+      "Routing message is the standard escalation message or routing is silent (no detailed explanation of what happened)"
+    ]
+  },
+  "timestamp": "2026-05-13T18:28:25.775268"
+}

@@ -1,0 +1,82 @@
+{
+  "id": "TC-002",
+  "name": "Happy Path: Immediate Cancellation (IMMEDIATE_NO_FEE, within 14 days)",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "I want to cancel my DAZN subscription",
+      "bot": "I'm sorry to hear you'd like to cancel your subscription. Could you please share the reason for your cancellation? Your feedback helps us improve your experience."
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "I only signed up for one event",
+      "bot": "Thank you for letting me know. Just to confirm, you signed up to watch a specific event and no longer need the subscription\u2014 is that correct?"
+    },
+    {
+      "type": "bot_message",
+      "turn": 3,
+      "user": "No, just cancel please",
+      "bot": "Could you please tell me a bit more about why you want to cancel? Your feedback really helps us improve our service."
+    },
+    {
+      "type": "bot_message",
+      "turn": 4,
+      "user": "Yes",
+      "bot": "Thank you for confirming. I\u2019ll continue with your cancellation request.\n\nDo you want to keep your DAZN account active by pausing your subscription instead? This lets you pause at no cost and reactivate whenever you choose, so you won\u2019t lose your current benefits. Would you like to explore this option?"
+    }
+  ],
+  "tool_calls_made": {},
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "Bot does NOT show 30-day notice or prorated payment messaging",
+        "verdict": "PASS",
+        "reason": "There is no mention of a 30-day notice or prorated payment in the transcript."
+      },
+      {
+        "criterion": "Bot shows immediate cancellation message saying access will end today",
+        "verdict": "FAIL",
+        "reason": "The bot does not state that access will end today or mention immediate cancellation."
+      },
+      {
+        "criterion": "Bot asks 'Would you like me to go ahead and cancel now?' before executing",
+        "verdict": "FAIL",
+        "reason": "The bot does not explicitly ask if the user wants to proceed with cancellation before executing."
+      },
+      {
+        "criterion": "cancelProductImmediate (not cancelProduct) is called after user confirms",
+        "verdict": "FAIL",
+        "reason": "No tool calls are made, including cancelProductImmediate, after user confirmation."
+      },
+      {
+        "criterion": "Bot confirms: 'Your plan is cancelled. You won't be charged again, and your access ends today.'",
+        "verdict": "FAIL",
+        "reason": "The bot does not provide this confirmation message or equivalent."
+      },
+      {
+        "criterion": "Bot does NOT mention subscriptionEndDate, cancellableOnDate, or nextChargeDate in confirmation",
+        "verdict": "PASS",
+        "reason": "There is no mention of subscriptionEndDate, cancellableOnDate, or nextChargeDate in the transcript."
+      },
+      {
+        "criterion": "Bot does NOT reveal that the 14-day window is the eligibility criterion",
+        "verdict": "PASS",
+        "reason": "The bot does not mention the 14-day window or eligibility criteria."
+      }
+    ],
+    "overall": "FAIL",
+    "summary": "The bot fails to provide required immediate cancellation messaging, confirmation, and does not execute the cancellation as specified.",
+    "criteria": [
+      "Bot does NOT show 30-day notice or prorated payment messaging",
+      "Bot shows immediate cancellation message saying access will end today",
+      "Bot asks 'Would you like me to go ahead and cancel now?' before executing",
+      "cancelProductImmediate (not cancelProduct) is called after user confirms",
+      "Bot confirms: 'Your plan is cancelled. You won't be charged again, and your access ends today.'",
+      "Bot does NOT mention subscriptionEndDate, cancellableOnDate, or nextChargeDate in confirmation",
+      "Bot does NOT reveal that the 14-day window is the eligibility criterion"
+    ]
+  },
+  "timestamp": "2026-05-13T18:27:46.677729"
+}

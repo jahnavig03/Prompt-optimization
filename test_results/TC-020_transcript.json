@@ -1,0 +1,58 @@
+{
+  "id": "TC-020",
+  "name": "Financial Hardship \u2014 Pause Suggested First",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "I need to cancel, I'm struggling financially",
+      "bot": "I'm sorry to hear about your situation. Could you please tell me which subscription you'd like to cancel? If you have more than one, let me know the name of the plan you want to end."
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "No thank you to the offer",
+      "bot": "Would you like to explore our Pause feature instead? This lets you pause your subscription at no cost and reactivate it whenever you choose. It's a great way to keep your account active without losing your current benefits.\n\nWould you like to explore this option?"
+    },
+    {
+      "type": "bot_message",
+      "turn": 3,
+      "user": "I'll think about the pause option",
+      "bot": "No problem at all. If you decide you'd like to pause your subscription, just let me know.\n\nWould you like to continue with cancelling your subscription now?"
+    },
+    {
+      "type": "bot_message",
+      "turn": 4,
+      "user": "Yes let's pause it for 1 month",
+      "bot": "Great! How long would you like to pause for? Please let me know the specific date you\u2019d like your pause to end (for example, one month from your next payment date)."
+    }
+  ],
+  "tool_calls_made": {},
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "Bot does NOT immediately proceed to cancellation after financial hardship reason",
+        "verdict": "PASS",
+        "reason": "The bot asks for clarification about which subscription to cancel and does not proceed directly to cancellation."
+      },
+      {
+        "criterion": "Bot presents either a retention offer or pause option before the cancellation impact message",
+        "verdict": "PASS",
+        "reason": "The bot presents the pause option as an alternative before discussing cancellation impacts."
+      },
+      {
+        "criterion": "Pause offer is presented (if available) and user is given the option to explore it",
+        "verdict": "PASS",
+        "reason": "The bot clearly presents the pause option and asks if the user would like to explore it."
+      }
+    ],
+    "overall": "PASS",
+    "summary": "All criteria are satisfied: the bot handled the financial hardship case appropriately, offered a pause, and did not proceed directly to cancellation.",
+    "criteria": [
+      "Bot does NOT immediately proceed to cancellation after financial hardship reason",
+      "Bot presents either a retention offer or pause option before the cancellation impact message",
+      "Pause offer is presented (if available) and user is given the option to explore it"
+    ]
+  },
+  "timestamp": "2026-05-13T18:32:05.785491"
+}

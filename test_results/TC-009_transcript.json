@@ -1,0 +1,58 @@
+{
+  "id": "TC-009",
+  "name": "zuoraStatus = Cancelled \u2014 Auto-Renewal Already Off",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "Cancel my subscription",
+      "bot": "I'm sorry to hear you'd like to cancel your subscription. Could you share the reason for your cancellation? Your feedback helps us improve your experience."
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "I just want to make sure it's cancelled",
+      "bot": "To help us improve, could you tell me a bit more about why you want to cancel your subscription? Any specific reason or feedback would be appreciated."
+    },
+    {
+      "type": "bot_message",
+      "turn": 3,
+      "user": "No, I don't want to reverse",
+      "bot": "Thank you for confirming. Is there anything else I can help you with today?"
+    }
+  ],
+  "tool_calls_made": {},
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "Bot explains auto-renewal is already turned off",
+        "verdict": "FAIL",
+        "reason": "The bot never mentions that auto-renewal is already turned off."
+      },
+      {
+        "criterion": "Bot mentions access continues until subscriptionEndDate (2026-06-01)",
+        "verdict": "FAIL",
+        "reason": "The bot does not mention that access continues until the subscription end date."
+      },
+      {
+        "criterion": "Bot asks if user wants to reverse (re-enable auto-renewal)",
+        "verdict": "PASS",
+        "reason": "The bot asks if the user wants to reverse by confirming if they want to cancel or not."
+      },
+      {
+        "criterion": "After user says no, bot closes without calling cancelProduct or cancelProductImmediate",
+        "verdict": "PASS",
+        "reason": "The bot closes the conversation and does not call cancelProduct or cancelProductImmediate."
+      }
+    ],
+    "overall": "FAIL",
+    "summary": "The bot failed to explain auto-renewal status and subscription end date, though it handled the reversal and closure correctly.",
+    "criteria": [
+      "Bot explains auto-renewal is already turned off",
+      "Bot mentions access continues until subscriptionEndDate (2026-06-01)",
+      "Bot asks if user wants to reverse (re-enable auto-renewal)",
+      "After user says no, bot closes without calling cancelProduct or cancelProductImmediate"
+    ]
+  },
+  "timestamp": "2026-05-13T18:29:07.270169"
+}

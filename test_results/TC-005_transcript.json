@@ -1,0 +1,97 @@
+{
+  "id": "TC-005",
+  "name": "Multiple Active Subscriptions \u2014 User Selects One",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "I'd like to cancel one of my subscriptions",
+      "bot": "Which subscription would you like to cancel? Please let me know the name of the plan you want to end."
+    },
+    {
+      "type": "tool_calls",
+      "turn": 2,
+      "tool_calls": [
+        {
+          "tool": "getProductDetailsForCancel",
+          "args": "{\"productGroup\":\"DAZN\"}",
+          "result": {
+            "productStatus": "ActivePaid",
+            "zuoraStatus": "Active",
+            "inFirst14Days": false,
+            "inFreeTrial": false,
+            "termType": "EVERGREEN",
+            "cancellationOptionType": "AUTO_RENEWAL_OFF",
+            "cancellationOptionMessage": "Your subscription will be cancelled after a 30-day notice period.",
+            "nextChargeDate": "2026-06-01",
+            "cancellableOnDate": "2026-07-01",
+            "subscriptionEndDate": "2026-07-01",
+            "cancelPeriodMessage": "30-day notice period applies.",
+            "isPenaltyApplied": false,
+            "penaltyAmount": 0,
+            "penaltyAmountCurrencyCode": "GBP",
+            "ratePlanName": "Monthly Flex",
+            "userSubscriptionName": "DAZN Monthly Flex",
+            "ultimateRatePlan": false
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_calls",
+      "turn": 2,
+      "tool_calls": [
+        {
+          "tool": "getCancelandOfferDetails",
+          "args": "{\"termType\":\"EVERGREEN\"}",
+          "result": {
+            "cancelOfferAvailable": false,
+            "cancelOfferMessage": "",
+            "cancellationOptionType": "AUTO_RENEWAL_OFF",
+            "cancellationOptionMessage": "Your subscription will be cancelled after a 30-day notice period.",
+            "isWatched15Mins": false,
+            "inFirst14Days": false,
+            "inFreeTrial": false
+          }
+        }
+      ]
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "Cancel the DAZN one",
+      "bot": "I'm sorry to hear you'd like to cancel your DAZN Monthly Flex plan. Could you share the reason for your cancellation? Your feedback helps us improve your experience."
+    }
+  ],
+  "tool_calls_made": {
+    "getProductDetailsForCancel": 1,
+    "getCancelandOfferDetails": 1
+  },
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "Bot asks which subscription the user wants to cancel (does not auto-select when multiple exist)",
+        "verdict": "PASS",
+        "reason": "The bot asks the user to specify which subscription to cancel in its first response."
+      },
+      {
+        "criterion": "Bot uses subscriptionName to describe each option (mentions 'DAZN Monthly Flex' and 'RallyTV Monthly')",
+        "verdict": "FAIL",
+        "reason": "The bot only mentions 'DAZN Monthly Flex' and does not mention 'RallyTV Monthly' or present both options."
+      },
+      {
+        "criterion": "Bot confirms or acknowledges the user's selection (DAZN) before proceeding",
+        "verdict": "PASS",
+        "reason": "The bot acknowledges the user's selection by referencing 'DAZN Monthly Flex' in its response."
+      }
+    ],
+    "overall": "FAIL",
+    "summary": "The bot failed to mention all subscription options, only referencing the selected one.",
+    "criteria": [
+      "Bot asks which subscription the user wants to cancel (does not auto-select when multiple exist)",
+      "Bot uses subscriptionName to describe each option (mentions 'DAZN Monthly Flex' and 'RallyTV Monthly')",
+      "Bot confirms or acknowledges the user's selection (DAZN) before proceeding"
+    ]
+  },
+  "timestamp": "2026-05-13T18:28:16.901500"
+}

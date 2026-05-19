@@ -1,0 +1,44 @@
+[
+  {
+    "id": "TC-001",
+    "name": "Happy path — [describe the main flow]",
+    "category": "happy_path",
+    "objective": "Verify the complete successful conversation flow end-to-end",
+    "conversation_script": [
+      "hi",
+      "book appointment",
+      "Employee Only"
+    ],
+    "pass_criteria": [
+      "Bot presents options via quick replies widget (not plain text)",
+      "Workflow slug_here is called before step N",
+      "Bot asks for state before city",
+      "Goal status is completed at end of conversation"
+    ],
+    "fail_indicators": [
+      "Bot skips step N",
+      "Bot lists options as plain text instead of widget",
+      "Bot asks for two pieces of information in one message"
+    ]
+  },
+  {
+    "id": "TC-002",
+    "name": "Validation — [describe what is being validated]",
+    "category": "validation",
+    "objective": "Verify that invalid input is rejected and user is re-prompted",
+    "conversation_script": [
+      "hi",
+      "book appointment",
+      "invalid input here"
+    ],
+    "pass_criteria": [
+      "Bot rejects the invalid input",
+      "Bot re-prompts without proceeding to next step",
+      "Bot does not hallucinate a value"
+    ],
+    "fail_indicators": [
+      "Bot accepts the invalid input and continues",
+      "Bot does not re-prompt"
+    ]
+  }
+]

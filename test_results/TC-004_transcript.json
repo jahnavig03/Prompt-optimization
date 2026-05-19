@@ -1,0 +1,58 @@
+{
+  "id": "TC-004",
+  "name": "User Not Signed In",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "I want to cancel my subscription",
+      "bot": "I'm sorry to hear you'd like to cancel your subscription. Could you share the reason for your cancellation? Your feedback helps us improve your experience."
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "I'm signed in",
+      "bot": "Could you please share the reason you'd like to cancel your subscription? Your feedback helps us improve your experience."
+    }
+  ],
+  "tool_calls_made": {},
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "Bot detects user is not signed in and explains they must sign in first",
+        "verdict": "FAIL",
+        "reason": "The bot does not mention sign-in status or instruct the user to sign in."
+      },
+      {
+        "criterion": "Bot provides the sign-in URL as a hyperlink or link",
+        "verdict": "FAIL",
+        "reason": "The bot does not provide any sign-in URL or link."
+      },
+      {
+        "criterion": "Bot asks user to reply confirming they are signed in",
+        "verdict": "FAIL",
+        "reason": "The bot does not ask the user to confirm sign-in status."
+      },
+      {
+        "criterion": "Bot does NOT proceed to pre-cancellation checks or subscription steps before sign-in confirmation",
+        "verdict": "PASS",
+        "reason": "The bot only asks for cancellation reason and does not proceed to cancellation steps."
+      },
+      {
+        "criterion": "After user says 'I'm signed in', bot proceeds toward the cancellation flow",
+        "verdict": "FAIL",
+        "reason": "The bot repeats the request for cancellation reason and does not proceed with the cancellation flow."
+      }
+    ],
+    "overall": "FAIL",
+    "summary": "The bot fails to handle sign-in detection, confirmation, and does not proceed with cancellation after sign-in is confirmed.",
+    "criteria": [
+      "Bot detects user is not signed in and explains they must sign in first",
+      "Bot provides the sign-in URL as a hyperlink or link",
+      "Bot asks user to reply confirming they are signed in",
+      "Bot does NOT proceed to pre-cancellation checks or subscription steps before sign-in confirmation",
+      "After user says 'I'm signed in', bot proceeds toward the cancellation flow"
+    ]
+  },
+  "timestamp": "2026-05-13T18:28:05.687241"
+}

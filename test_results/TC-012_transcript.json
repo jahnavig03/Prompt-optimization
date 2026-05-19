@@ -1,0 +1,52 @@
+{
+  "id": "TC-012",
+  "name": "Streaming Issue Reason \u2014 Route to TS Agent",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "I want to cancel",
+      "bot": "To proceed with your cancellation, you'll need to be signed in to your DAZN account. You can sign in here: <a href=\"https://dazn.com/en-AU/account/content/DAZN/signup?signin=true&page=emailDetails\" target=\"_blank\">DAZN | Sign in</a>\n\nOnce you're signed in, please reply 'I'm signed in' and I'll continue."
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "The video keeps buffering and quality is terrible on my TV",
+      "bot": "I want to make sure this is handled perfectly for you, so I'm bringing in one of our specialists to take care of this.\n[ROUTE TO: TS Buffering and Poor Video Quality]"
+    }
+  ],
+  "tool_calls_made": {},
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "Bot asks for a cancellation reason before routing",
+        "verdict": "FAIL",
+        "reason": "The bot did not ask for a cancellation reason before routing; it only asked the user to sign in."
+      },
+      {
+        "criterion": "After streaming/buffering/quality reason, bot routes to [TS Buffering and Poor Video Quality]",
+        "verdict": "PASS",
+        "reason": "After the user mentioned buffering and quality issues, the bot routed to [TS Buffering and Poor Video Quality]."
+      },
+      {
+        "criterion": "Bot uses the standard escalation message before routing (not a custom message)",
+        "verdict": "FAIL",
+        "reason": "The bot used a custom escalation message ('I want to make sure this is handled perfectly for you...') instead of the standard escalation message."
+      },
+      {
+        "criterion": "Bot does NOT continue with cancellation steps after routing",
+        "verdict": "PASS",
+        "reason": "The bot did not continue with cancellation steps after routing to the specialist."
+      }
+    ],
+    "overall": "FAIL",
+    "summary": "The bot failed to ask for a cancellation reason before routing and did not use the standard escalation message, resulting in an overall FAIL.",
+    "criteria": [
+      "Bot asks for a cancellation reason before routing",
+      "After streaming/buffering/quality reason, bot routes to [TS Buffering and Poor Video Quality]",
+      "Bot uses the standard escalation message before routing (not a custom message)",
+      "Bot does NOT continue with cancellation steps after routing"
+    ]
+  },
+  "timestamp": "2026-05-13T18:29:29.434182"
+}

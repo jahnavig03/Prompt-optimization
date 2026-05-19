@@ -1,0 +1,150 @@
+{
+  "run_timestamp": "2026-05-13T18:27:09.430772",
+  "model": "gpt-4.1",
+  "total": 20,
+  "passed": 7,
+  "failed": 13,
+  "errors": 0,
+  "results": {
+    "TC-001": {
+      "overall": "FAIL",
+      "summary": "Several required tool calls and key cancellation flow steps are missing, resulting in a failure to meet the pass criteria.",
+      "tool_calls_made": {},
+      "stopped_reason": "completed"
+    },
+    "TC-002": {
+      "overall": "FAIL",
+      "summary": "The bot fails to provide required immediate cancellation messaging, confirmation, and does not execute the cancellation as specified.",
+      "tool_calls_made": {},
+      "stopped_reason": "completed"
+    },
+    "TC-003": {
+      "overall": "FAIL",
+      "summary": "Most criteria are not met: the required cancellation message is missing, the pause offer is shown before cancellation, no cancellation tool is called, and confirmation is not requested.",
+      "tool_calls_made": {},
+      "stopped_reason": "completed"
+    },
+    "TC-004": {
+      "overall": "FAIL",
+      "summary": "The bot fails to handle sign-in detection, confirmation, and does not proceed with cancellation after sign-in is confirmed.",
+      "tool_calls_made": {},
+      "stopped_reason": "completed"
+    },
+    "TC-005": {
+      "overall": "FAIL",
+      "summary": "The bot failed to mention all subscription options, only referencing the selected one.",
+      "tool_calls_made": {
+        "getProductDetailsForCancel": 1,
+        "getCancelandOfferDetails": 1
+      },
+      "stopped_reason": "completed"
+    },
+    "TC-006": {
+      "overall": "FAIL",
+      "summary": "The transcript fails to meet the required criteria as the necessary tool call and routing to the specified agent did not occur.",
+      "tool_calls_made": {},
+      "stopped_reason": "completed"
+    },
+    "TC-007": {
+      "overall": "FAIL",
+      "summary": "The bot fails to inform the user that their subscription is currently paused, but correctly asks for confirmation and continues the cancellation flow after confirmation.",
+      "tool_calls_made": {
+        "getCancelandOfferDetails": 1
+      },
+      "stopped_reason": "completed"
+    },
+    "TC-008": {
+      "overall": "FAIL",
+      "summary": "The bot failed to address most of the required criteria, only passing the one about not proceeding with cancellation for a Frozen/Expired subscription.",
+      "tool_calls_made": {
+        "getCancelandOfferDetails": 1
+      },
+      "stopped_reason": "completed"
+    },
+    "TC-009": {
+      "overall": "FAIL",
+      "summary": "The bot failed to explain auto-renewal status and subscription end date, though it handled the reversal and closure correctly.",
+      "tool_calls_made": {},
+      "stopped_reason": "completed"
+    },
+    "TC-010": {
+      "overall": "PASS",
+      "summary": "All criteria are fully satisfied; the bot routed immediately and only displayed the routing marker.",
+      "tool_calls_made": {},
+      "stopped_reason": "routing"
+    },
+    "TC-011": {
+      "overall": "PASS",
+      "summary": "All criteria are clearly satisfied: the bot routes immediately without asking for a cancellation reason.",
+      "tool_calls_made": {},
+      "stopped_reason": "routing"
+    },
+    "TC-012": {
+      "overall": "FAIL",
+      "summary": "The bot failed to ask for a cancellation reason before routing and did not use the standard escalation message, resulting in an overall FAIL.",
+      "tool_calls_made": {},
+      "stopped_reason": "routing"
+    },
+    "TC-013": {
+      "overall": "PASS",
+      "summary": "All criteria are fully satisfied; the bot correctly handles the cancellation flow as required.",
+      "tool_calls_made": {
+        "getCancelandOfferDetails": 1
+      },
+      "stopped_reason": "completed"
+    },
+    "TC-014": {
+      "overall": "FAIL",
+      "summary": "The bot failed to handle the cancellation offer scenario and did not meet most of the required criteria.",
+      "tool_calls_made": {},
+      "stopped_reason": "completed"
+    },
+    "TC-015": {
+      "overall": "FAIL",
+      "summary": "The bot presented and offered the pause feature correctly, but failed to ask for the pause duration and did not confirm the required pause details after the user specified 2 months.",
+      "tool_calls_made": {},
+      "stopped_reason": "completed"
+    },
+    "TC-016": {
+      "overall": "PASS",
+      "summary": "All criteria are fully satisfied; the bot handled the RallyTV cancellation flow correctly without offering a pause and provided the required cancellation impact details.",
+      "tool_calls_made": {
+        "getProductDetailsForCancel": 1,
+        "getCancelandOfferDetails": 1,
+        "cancelProduct": 1
+      },
+      "stopped_reason": "completed"
+    },
+    "TC-017": {
+      "overall": "PASS",
+      "summary": "All criteria are fully satisfied; the bot handled the cancellation request and retraction correctly and politely.",
+      "tool_calls_made": {
+        "getCancelandOfferDetails": 1
+      },
+      "stopped_reason": "completed"
+    },
+    "TC-018": {
+      "overall": "FAIL",
+      "summary": "Most critical pass criteria are not met, including tool call, exact phrasing, and routing to an agent.",
+      "tool_calls_made": {},
+      "stopped_reason": "completed"
+    },
+    "TC-019": {
+      "overall": "PASS",
+      "summary": "All criteria are fully satisfied; the bot handled the cancellation and refund scenario correctly.",
+      "tool_calls_made": {
+        "conversation_gj4s1bgr": 1,
+        "getProductDetailsForCancel": 1,
+        "getCancelandOfferDetails": 1,
+        "cancelProductImmediate": 1
+      },
+      "stopped_reason": "completed"
+    },
+    "TC-020": {
+      "overall": "PASS",
+      "summary": "All criteria are satisfied: the bot handled the financial hardship case appropriately, offered a pause, and did not proceed directly to cancellation.",
+      "tool_calls_made": {},
+      "stopped_reason": "completed"
+    }
+  }
+}

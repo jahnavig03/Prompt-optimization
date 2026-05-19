@@ -1,0 +1,73 @@
+{
+  "id": "TC-007",
+  "name": "productStatus = ActivePaused \u2014 Ask If Still Want to Cancel",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "Cancel my subscription",
+      "bot": "I'm sorry to hear you'd like to cancel your subscription. Could you share the reason for your cancellation? Your feedback helps us improve your experience."
+    },
+    {
+      "type": "tool_calls",
+      "turn": 2,
+      "tool_calls": [
+        {
+          "tool": "getCancelandOfferDetails",
+          "args": "{\"termType\":\"EVERGREEN\"}",
+          "result": {
+            "cancelOfferAvailable": false,
+            "cancelOfferMessage": "",
+            "cancellationOptionType": "AUTO_RENEWAL_OFF",
+            "cancellationOptionMessage": "Your subscription will be cancelled after a 30-day notice period.",
+            "isWatched15Mins": false,
+            "inFirst14Days": false,
+            "inFreeTrial": false
+          }
+        }
+      ]
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "I don't use it anymore",
+      "bot": "I understand. Instead of cancelling, we recommend trying our Pause feature. This lets you pause your subscription at no cost and reactivate it whenever you choose. It's a great way to keep your account active without losing your current benefits.\n\nWould you like to explore this option?"
+    },
+    {
+      "type": "bot_message",
+      "turn": 3,
+      "user": "Yes I still want to cancel",
+      "bot": "If I cancel your subscription today, your 30-day notice period will begin. During this time, you can still enjoy full access to DAZN content without any interruptions.\n\nIf applicable, you will make a final prorated payment on your scheduled billing date, [nextChargeDate]. This payment will be lower than your usual monthly charge, as it covers the remaining days of the notice period.\n\nWould you like me to go ahead and cancel now?"
+    }
+  ],
+  "tool_calls_made": {
+    "getCancelandOfferDetails": 1
+  },
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "Bot informs user their subscription is currently paused",
+        "verdict": "FAIL",
+        "reason": "The bot does not mention that the user's subscription is currently paused at any point in the transcript."
+      },
+      {
+        "criterion": "Bot asks if they still want to cancel",
+        "verdict": "PASS",
+        "reason": "The bot asks 'Would you like to explore this option?' after offering the Pause feature, which serves as a confirmation if the user still wants to cancel."
+      },
+      {
+        "criterion": "After user confirms yes, flow continues toward cancellation (retention/impact steps)",
+        "verdict": "PASS",
+        "reason": "After the user confirms they still want to cancel, the bot provides details about the cancellation process and asks for final confirmation."
+      }
+    ],
+    "overall": "FAIL",
+    "summary": "The bot fails to inform the user that their subscription is currently paused, but correctly asks for confirmation and continues the cancellation flow after confirmation.",
+    "criteria": [
+      "Bot informs user their subscription is currently paused",
+      "Bot asks if they still want to cancel",
+      "After user confirms yes, flow continues toward cancellation (retention/impact steps)"
+    ]
+  },
+  "timestamp": "2026-05-13T18:28:37.310546"
+}

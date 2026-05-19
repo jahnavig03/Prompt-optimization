@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Live Bot Test — Prompt Optimization Lab</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --brand:        #2563eb;
+  --brand-light:  #eff6ff;
+  --brand-border: #bfdbfe;
+  --success:      #16a34a;
+  --success-bg:   #f0fdf4;
+  --success-bd:   #bbf7d0;
+  --error:        #dc2626;
+  --error-bg:     #fef2f2;
+  --error-bd:     #fecaca;
+  --warning:      #d97706;
+  --warning-bg:   #fffbeb;
+  --warning-bd:   #fde68a;
+  --purple:       #7c3aed;
+  --purple-bg:    #f5f3ff;
+  --purple-bd:    #ddd6fe;
+  --border:       #e5e7eb;
+  --border-md:    #d1d5db;
+  --text-1:       #111827;
+  --text-2:       #374151;
+  --text-3:       #6b7280;
+  --text-4:       #9ca3af;
+  --surface:      #ffffff;
+  --surface-2:    #f9fafb;
+  --surface-3:    #f3f4f6;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--surface-2); color: var(--text-1); -webkit-font-smoothing: antialiased; }
+.scrollbar-thin::-webkit-scrollbar { width: 4px; height: 4px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 3px; }
+
+/* Animations */
+.spin { animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.pulse { animation: pulse 1.4s ease infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+.fade-in { animation: fadeIn .18s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:none; } }
+
+/* Badges */
+.badge { display:inline-flex; align-items:center; padding:2px 7px; border-radius:20px; font-size:10px; font-weight:600; letter-spacing:.02em; }
+.badge-pass    { background:var(--success-bg); color:var(--success);  border:1px solid var(--success-bd); }
+.badge-fail    { background:var(--error-bg);   color:var(--error);    border:1px solid var(--error-bd); }
+.badge-error   { background:var(--warning-bg); color:var(--warning);  border:1px solid var(--warning-bd); }
+.badge-pending { background:var(--surface-3);  color:var(--text-3);   border:1px solid var(--border); }
+.badge-running { background:var(--brand-light);color:var(--brand);    border:1px solid var(--brand-border); }
+.badge-eval    { background:var(--purple-bg);  color:var(--purple);   border:1px solid var(--purple-bd); }
+
+/* Status dot */
+.dot { width:7px; height:7px; border-radius:50%; display:inline-block; flex-shrink:0; }
+.dot-pass    { background:var(--success); }
+.dot-fail    { background:var(--error); }
+.dot-error   { background:var(--warning); }
+.dot-pending { background:var(--border-md); }
+.dot-running { background:var(--brand); animation:pulse 1s infinite; }
+.dot-eval    { background:var(--purple); animation:pulse 1s infinite; }
+
+/* Buttons */
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:6px 12px; border-radius:7px; font-size:12px; font-weight:500; cursor:pointer; transition:all .14s; border:1px solid transparent; white-space:nowrap; line-height:1.4; }
+.btn:disabled { opacity:.45; cursor:not-allowed; }
+.btn-primary { background:var(--brand); color:#fff; border-color:var(--brand); }
+.btn-primary:hover:not(:disabled) { background:#1d4ed8; }
+.btn-ghost   { background:var(--surface); color:var(--text-2); border-color:var(--border-md); }
+.btn-ghost:hover:not(:disabled)   { background:var(--surface-2); border-color:#9ca3af; }
+.btn-danger  { background:var(--error-bg); color:var(--error); border-color:var(--error-bd); }
+.btn-danger:hover:not(:disabled)  { background:#fee2e2; }
+.btn-sm { padding:4px 9px; font-size:11px; border-radius:5px; }
+
+/* Cards */
+.card { background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+
+/* Test list rows */
+.test-row { display:flex; align-items:center; gap:7px; padding:8px 12px; cursor:pointer; font-size:11px; border-bottom:1px solid var(--surface-3); transition:background .1s; }
+.test-row:hover { background:var(--surface-2); }
+.test-row.selected { background:var(--brand-light); border-left:3px solid var(--brand); padding-left:9px; }
+
+/* Turn bubbles */
+.turn-user { background:var(--brand-light); border:1px solid var(--brand-border); border-left:3px solid var(--brand); border-radius:8px; }
+.turn-bot  { background:var(--success-bg);  border:1px solid var(--success-bd);  border-left:3px solid var(--success); border-radius:8px; }
+
+/* Run history row */
+.run-row { display:flex; align-items:center; padding:6px 10px; cursor:pointer; font-size:11px; border-bottom:1px solid var(--surface-3); transition:background .1s; gap:8px; }
+.run-row:hover { background:var(--surface-2); }
+.run-row.active-run { background:var(--brand-light); }
+
+/* Mode toggle */
+.mode-btn { font-size:11px; font-weight:500; padding:4px 12px; border-radius:5px; cursor:pointer; transition:all .14s; color:var(--text-3); border:none; background:transparent; }
+.mode-btn.active { background:var(--surface); color:var(--text-1); box-shadow:0 1px 3px rgba(0,0,0,.1); font-weight:600; }
+
+/* Section header */
+.sec-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+.sec-label { font-size:10px; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:.07em; }
+.sec-collapse-btn { font-size:10px; color:var(--text-4); cursor:pointer; padding:2px 4px; border-radius:3px; border:none; background:none; }
+.sec-collapse-btn:hover { background:var(--surface-3); color:var(--text-2); }
+
+/* Sidebar section */
+.sidebar-section { padding:0 12px; margin-bottom:2px; }
+.sidebar-section:first-child { padding-top:8px; }
+
+/* Sidebar resize handle */
+.resize-handle {
+  width: 5px; cursor: col-resize; background: transparent; flex-shrink:0;
+  position: relative; z-index: 10; transition: background .15s;
+}
+.resize-handle:hover, .resize-handle.dragging { background: var(--brand); opacity: 0.3; }
+.resize-handle::after {
+  content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  width: 3px; height: 32px; border-radius: 2px; background: var(--border-md); opacity: 0; transition: opacity .15s;
+}
+.resize-handle:hover::after { opacity: 1; }
+
+/* Generic field label */
+.field-label { font-size:10px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:.05em; display:block; margin-bottom:3px; }
+
+/* Credential inputs */
+.cred-input {
+  width:100%; font-size:11px; padding:5px 8px; border-radius:6px;
+  border:1px solid var(--border); background:var(--surface-2);
+  outline:none; transition: border-color .15s, box-shadow .15s;
+}
+.cred-input:focus { border-color:var(--brand-border); box-shadow:0 0 0 2px rgba(37,99,235,.1); }
+
+/* Scrollable inner lists */
+.inner-list {
+  overflow-y: auto; border-radius: 6px; border: 1px solid var(--border);
+}
+</style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+<!-- ══ Header ════════════════════════════════════════════════════════════════ -->
+<header class="flex items-center gap-3 px-5 border-b border-gray-200 bg-white shrink-0 shadow-sm" style="height:48px">
+  <div class="flex items-center gap-2 shrink-0">
+    <div class="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold" style="background:var(--brand)">P</div>
+    <span class="font-semibold text-gray-800 text-sm tracking-tight">Prompt Optimization Lab</span>
+  </div>
+  <div class="w-px h-4 bg-gray-200 shrink-0 mx-0.5"></div>
+  <span class="text-xs font-semibold" style="color:var(--purple)">Live Bot Test</span>
+  <div class="flex-1"></div>
+
+  <!-- Score summary -->
+  <div id="score-bar" class="hidden items-center gap-2.5 text-xs">
+    <span class="text-gray-400">Results:</span>
+    <span id="hdr-pass" class="font-bold" style="color:var(--success)">0 pass</span>
+    <span class="text-gray-300">/</span>
+    <span id="hdr-fail" class="font-bold" style="color:var(--error)">0 fail</span>
+    <span class="text-gray-300">/</span>
+    <span id="hdr-total" class="font-semibold text-gray-500">0 total</span>
+    <button id="btn-download-report" onclick="downloadReport()" class="btn btn-ghost btn-sm ml-1" style="gap:3px;font-size:10px;padding:3px 8px">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v9m0 0l-3-3m3 3l3-3M3 13h10"/></svg>
+      PDF
+    </button>
+  </div>
+
+  <a href="/" class="btn btn-ghost btn-sm ml-2">← Back to Lab</a>
+</header>
+
+<!-- ══ Layout ════════════════════════════════════════════════════════════════ -->
+<div class="flex flex-1 min-h-0">
+
+<!-- ── Left config panel (resizable) ─────────────────────────────────────── -->
+<aside id="sidebar" class="shrink-0 border-r border-gray-200 bg-white flex flex-col" style="width:280px;min-width:220px;max-width:480px">
+
+  <!-- Scrollable config body — single scroll zone -->
+  <div class="flex-1 overflow-y-auto scrollbar-thin flex flex-col min-h-0">
+
+    <!-- Bot URL -->
+    <div class="sidebar-section" style="padding-top:10px">
+      <div class="sec-hdr"><span class="sec-label">Bot URL</span></div>
+      <div id="bot-url-preview" class="text-xs text-gray-400 font-mono break-all px-2 py-1 rounded bg-gray-50 border border-gray-100" style="font-size:10px;line-height:1.4">
+        loading…
+      </div>
+    </div>
+
+    <!-- Agent selector -->
+    <div class="sidebar-section" style="margin-top:6px">
+      <div class="sec-hdr">
+        <span class="sec-label">Select Agents</span>
+        <button onclick="toggleAll()" id="btn-select-all"
+          class="text-xs font-medium px-1.5 py-0.5 rounded" style="font-size:10px;color:var(--brand);background:var(--brand-light);border:1px solid var(--brand-border)">
+          Select All
+        </button>
+      </div>
+      <div id="agent-list" class="inner-list scrollbar-thin" style="max-height:140px">
+        <div class="text-xs text-gray-400 py-3 text-center">Loading agents…</div>
+      </div>
+    </div>
+
+    <!-- Run mode -->
+    <div class="sidebar-section" style="margin-top:8px">
+      <div class="sec-hdr"><span class="sec-label">Run Mode</span></div>
+      <div class="flex items-center gap-0.5 bg-gray-100 border border-gray-200 rounded-md p-0.5 w-fit">
+        <button id="mode-headless" class="mode-btn active" onclick="setMode('headless')">Headless</button>
+        <button id="mode-browser"  class="mode-btn"        onclick="setMode('browser')">Browser</button>
+      </div>
+      <p id="mode-hint" class="text-gray-400 mt-1" style="font-size:10px">Runs silently in the background.</p>
+    </div>
+
+    <!-- Credentials (auto-detected) -->
+    <div id="cred-section" class="sidebar-section hidden" style="margin-top:8px">
+      <div class="sec-hdr"><span class="sec-label">Test Credentials</span></div>
+      <p id="cred-hint" class="text-gray-400 mb-1.5" style="font-size:10px">Auto-detected from agent prompts.</p>
+      <div id="cred-email-wrap" class="hidden mb-1.5">
+        <span class="field-label">Email</span>
+        <input id="cred-email" type="email" placeholder="e.g. john.doe@gmail.com" class="cred-input"/>
+      </div>
+      <div id="cred-phone-wrap" class="hidden mb-1.5">
+        <span class="field-label">Phone Number</span>
+        <input id="cred-phone" type="tel" placeholder="e.g. 9876543210" class="cred-input"/>
+      </div>
+      <div id="cred-otp-hint" class="hidden text-xs px-2 py-1.5 rounded-md" style="font-size:10px;background:var(--warning-bg);border:1px solid var(--warning-bd);color:var(--warning);line-height:1.4">
+        OTP required — automation will pause for you to enter the code.
+      </div>
+    </div>
+
+    <!-- Past Runs -->
+    <div class="sidebar-section" style="margin-top:8px;padding-bottom:8px">
+      <div class="sec-hdr"><span class="sec-label">Past Runs</span></div>
+      <div id="past-runs" class="inner-list scrollbar-thin" style="max-height:130px">
+        <div class="text-xs text-gray-400 py-3 text-center">No runs yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Fixed Run footer ───────────────────────────────────────────────── -->
+  <div class="shrink-0 border-t border-gray-200 bg-white px-3 py-2.5 flex flex-col gap-1.5">
+    <div id="error-banner" class="hidden text-xs px-2.5 py-1.5 rounded-md font-medium"
+      style="background:var(--error-bg);color:var(--error);border:1px solid var(--error-bd)"></div>
+    <button id="btn-run" onclick="startRun()" class="btn btn-primary w-full" style="font-size:12px;padding:8px 12px">
+      ▶&nbsp; Generate &amp; Run Tests
+    </button>
+    <button id="btn-stop" onclick="stopRun()" class="hidden btn btn-danger btn-sm w-full">
+      ■&nbsp; Stop Run
+    </button>
+    <p id="run-status" class="text-xs text-center text-gray-400" style="min-height:14px;font-size:10px"></p>
+  </div>
+</aside>
+
+<!-- Resize handle -->
+<div id="resize-handle" class="resize-handle"></div>
+
+<!-- ── Main results panel ─────────────────────────────────────────────────── -->
+<main class="flex flex-1 min-h-0">
+
+  <!-- Test list -->
+  <div id="test-list-panel" class="shrink-0 border-r border-gray-200 bg-white flex flex-col" style="width:280px;min-width:200px">
+    <div class="px-3 py-2.5 border-b border-gray-100 shrink-0 flex items-center justify-between">
+      <span class="sec-label">Tests</span>
+      <span id="list-count" class="text-xs text-gray-400" style="font-size:10px"></span>
+    </div>
+    <div id="test-list" class="flex-1 overflow-y-auto scrollbar-thin">
+      <div id="list-empty" class="text-xs text-gray-400 text-center py-12 px-4" style="line-height:1.8">
+        Select agents and click<br><strong>Generate &amp; Run Tests</strong><br>to start.
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail pane -->
+  <div class="flex-1 overflow-y-auto scrollbar-thin bg-white">
+    <!-- Empty state -->
+    <div id="detail-empty" class="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
+      <div class="text-3xl">🤖</div>
+      <p class="text-xs">Click a test to see details.</p>
+    </div>
+
+    <!-- Detail content -->
+    <div id="detail-pane" class="hidden p-5 max-w-3xl mx-auto fade-in">
+
+      <!-- Test header -->
+      <div class="flex items-center gap-3 mb-4">
+        <div id="dp-dot" class="dot dot-pending" style="width:9px;height:9px"></div>
+        <div class="flex-1 min-w-0">
+          <p id="dp-name" class="font-semibold text-gray-900 text-sm truncate"></p>
+          <p id="dp-ucname" class="text-xs text-gray-400 mt-0.5"></p>
+        </div>
+        <span id="dp-badge" class="badge badge-pending">pending</span>
+      </div>
+
+      <!-- Summary -->
+      <div id="dp-summary-wrap" class="hidden mb-3 text-xs px-3 py-2 rounded-lg border" style="background:var(--surface-2);border-color:var(--border)">
+        <span class="font-medium text-gray-600">Judge: </span>
+        <span id="dp-summary" class="text-gray-700"></span>
+      </div>
+
+      <!-- Turn-by-turn transcript -->
+      <div class="mb-4">
+        <p class="sec-label mb-2">Conversation</p>
+        <div id="dp-turns" class="space-y-2"></div>
+        <div id="dp-turns-empty" class="text-xs text-gray-400 py-3 text-center">Waiting for turns…</div>
+      </div>
+
+      <!-- OTP input overlay -->
+      <div id="dp-otp-overlay" class="hidden mb-4 p-3.5 rounded-lg fade-in" style="background:var(--warning-bg);border:2px solid var(--warning-bd)">
+        <div class="flex items-center gap-2 mb-1.5">
+          <span class="text-base">🔑</span>
+          <p class="font-semibold text-xs" style="color:var(--warning)">OTP Required</p>
+        </div>
+        <p class="text-xs text-gray-600 mb-2.5" style="font-size:11px">Enter the verification code below and click Continue to resume.</p>
+        <div class="flex items-center gap-2">
+          <input id="otp-input" type="text" placeholder="Enter OTP…" maxlength="10"
+            class="flex-1 text-xs px-2.5 py-1.5 rounded-md border border-gray-300 bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
+            onkeydown="if(event.key==='Enter')submitOtp()"/>
+          <button onclick="submitOtp()" class="btn btn-primary btn-sm">Continue</button>
+        </div>
+        <p id="otp-status" class="text-xs mt-1" style="font-size:10px;color:var(--text-4)"></p>
+      </div>
+
+      <!-- Criteria -->
+      <div id="dp-criteria-wrap" class="hidden">
+        <p class="sec-label mb-2">Pass Criteria</p>
+        <div id="dp-criteria" class="space-y-1.5"></div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- ══ Script ════════════════════════════════════════════════════════════════ -->
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let useCases      = [];
+let selectedUcIds = new Set();
+let runMode       = 'headless';
+let currentRunId  = null;
+let currentEs     = null;
+let testState     = {};
+let selectedTcId  = null;
+let otpWaitingTestId = null;
+
+// ── Sidebar resize ──────────────────────────────────────────────────────────
+(function initResize() {
+  const handle  = document.getElementById('resize-handle');
+  const sidebar = document.getElementById('sidebar');
+  let dragging  = false;
+  let startX, startW;
+
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    dragging = true;
+    startX   = e.clientX;
+    startW   = sidebar.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const newW = Math.min(480, Math.max(220, startW + (e.clientX - startX)));
+    sidebar.style.width = newW + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+})();
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const r = await fetch(path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  return r.json();
+}
+
+function setStatus(msg, isError = false) {
+  document.getElementById('run-status').textContent = isError ? '' : msg;
+  const banner = document.getElementById('error-banner');
+  if (isError) {
+    banner.textContent = msg;
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+
+function fmtTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+// ── Initialisation ────────────────────────────────────────────────────────────
+async function init() {
+  const [cfg, ucs, runs] = await Promise.all([
+    api('/api/config'),
+    api('/api/playwright/use-cases'),
+    api('/api/playwright/runs'),
+  ]);
+
+  const botId = cfg.bot_id || '';
+  document.getElementById('bot-url-preview').textContent = botId
+    ? `nexus.yellow.ai/liveBot/${botId}?region=&version=v3`
+    : '⚠ Bot ID not configured — open Settings in the Lab';
+
+  useCases = ucs;
+  renderAgentList();
+  renderPastRuns(runs);
+}
+
+// ── Agent selector ────────────────────────────────────────────────────────────
+function renderAgentList() {
+  const el = document.getElementById('agent-list');
+  if (!useCases.length) {
+    el.innerHTML = '<div class="text-xs text-gray-400 py-3 text-center">No agents found.<br>Create one in the Lab.</div>';
+    return;
+  }
+  el.innerHTML = useCases.map(uc => `
+    <label style="display:flex;align-items:center;gap:7px;padding:6px 8px;cursor:pointer;border-bottom:1px solid var(--surface-3);font-size:12px">
+      <input type="checkbox" id="uc-${uc.id}" ${selectedUcIds.has(uc.id) ? 'checked' : ''}
+             onchange="onAgentCheck(${uc.id}, this.checked)"
+             style="accent-color:var(--brand);width:13px;height:13px;flex-shrink:0;cursor:pointer"/>
+      <div class="min-w-0 flex-1">
+        <p class="font-medium text-gray-800 truncate" style="font-size:12px;line-height:1.3">${escHtml(uc.name)}</p>
+        <p class="text-gray-400 truncate" style="font-size:10px">${fmtTime(uc.created_at)}</p>
+      </div>
+    </label>
+  `).join('');
+  syncSelectAllBtn();
+}
+
+function onAgentCheck(id, checked) {
+  if (checked) selectedUcIds.add(id);
+  else selectedUcIds.delete(id);
+  syncSelectAllBtn();
+  detectCredentials();
+}
+
+function toggleAll() {
+  const allSelected = useCases.every(uc => selectedUcIds.has(uc.id));
+  if (allSelected) {
+    useCases.forEach(uc => selectedUcIds.delete(uc.id));
+  } else {
+    useCases.forEach(uc => selectedUcIds.add(uc.id));
+  }
+  useCases.forEach(uc => {
+    const cb = document.getElementById(`uc-${uc.id}`);
+    if (cb) cb.checked = selectedUcIds.has(uc.id);
+  });
+  syncSelectAllBtn();
+  detectCredentials();
+}
+
+function syncSelectAllBtn() {
+  const btn = document.getElementById('btn-select-all');
+  if (!btn || !useCases.length) return;
+  const allSelected = useCases.every(uc => selectedUcIds.has(uc.id));
+  btn.textContent = allSelected ? 'Deselect All' : 'Select All';
+}
+
+// ── Credential detection ─────────────────────────────────────────────────────
+let _detectTimer = null;
+async function detectCredentials() {
+  clearTimeout(_detectTimer);
+  const section = document.getElementById('cred-section');
+  if (!selectedUcIds.size) { section.classList.add('hidden'); return; }
+  _detectTimer = setTimeout(async () => {
+    try {
+      const r = await api('/api/playwright/detect-credentials', {
+        method: 'POST',
+        body: JSON.stringify({ use_case_ids: [...selectedUcIds] }),
+      });
+      const any = r.needs_email || r.needs_phone || r.needs_otp;
+      section.classList.toggle('hidden', !any);
+      document.getElementById('cred-email-wrap').classList.toggle('hidden', !r.needs_email);
+      document.getElementById('cred-phone-wrap').classList.toggle('hidden', !r.needs_phone);
+      document.getElementById('cred-otp-hint').classList.toggle('hidden', !r.needs_otp);
+    } catch (e) {
+      section.classList.add('hidden');
+    }
+  }, 300);
+}
+
+// ── OTP submission ───────────────────────────────────────────────────────────
+async function submitOtp() {
+  const input = document.getElementById('otp-input');
+  const otp   = (input.value || '').trim();
+  if (!otp) { document.getElementById('otp-status').textContent = 'Please enter the OTP.'; return; }
+  if (!currentRunId) return;
+  document.getElementById('otp-status').textContent = 'Sending…';
+  try {
+    const r = await api(`/api/playwright/otp/${currentRunId}`, {
+      method: 'POST',
+      body: JSON.stringify({ otp }),
+    });
+    if (r.ok) {
+      document.getElementById('otp-status').textContent = 'OTP sent — resuming…';
+      setTimeout(() => {
+        document.getElementById('dp-otp-overlay').classList.add('hidden');
+        input.value = '';
+        document.getElementById('otp-status').textContent = '';
+        otpWaitingTestId = null;
+      }, 1500);
+    } else {
+      document.getElementById('otp-status').textContent = r.error || 'Failed.';
+    }
+  } catch (e) {
+    document.getElementById('otp-status').textContent = 'Network error.';
+  }
+}
+
+// ── Mode toggle ───────────────────────────────────────────────────────────────
+function setMode(m) {
+  runMode = m;
+  document.getElementById('mode-headless').classList.toggle('active', m === 'headless');
+  document.getElementById('mode-browser' ).classList.toggle('active', m === 'browser');
+  document.getElementById('mode-hint').textContent = m === 'headless'
+    ? 'Runs silently in the background.'
+    : 'Opens a visible browser — watch automation live.';
+}
+
+// ── Run lifecycle ─────────────────────────────────────────────────────────────
+async function startRun() {
+  if (!selectedUcIds.size) { setStatus('Select at least one agent.', true); return; }
+
+  testState        = {};
+  selectedTcId     = null;
+  otpWaitingTestId = null;
+  document.getElementById('dp-otp-overlay').classList.add('hidden');
+  document.querySelectorAll('#test-list .test-row').forEach(el => el.remove());
+  document.getElementById('list-empty').classList.remove('hidden');
+  document.getElementById('list-count').textContent = '';
+  document.getElementById('detail-pane').classList.add('hidden');
+  document.getElementById('detail-empty').classList.remove('hidden');
+  document.getElementById('score-bar').classList.add('hidden');
+  document.getElementById('score-bar').style.display = 'none';
+  document.getElementById('error-banner').classList.add('hidden');
+
+  document.getElementById('btn-run').disabled = true;
+  document.getElementById('btn-stop').classList.remove('hidden');
+  setStatus('Generating test cases…');
+
+  try {
+    const resp = await api('/api/playwright/run', {
+      method: 'POST',
+      body: JSON.stringify({
+        use_case_ids: [...selectedUcIds],
+        mode: runMode,
+        email: (document.getElementById('cred-email').value || '').trim(),
+        phone: (document.getElementById('cred-phone').value || '').trim(),
+      }),
+    });
+
+    if (resp.error) {
+      setStatus(resp.error, true);
+      document.getElementById('btn-run').disabled = false;
+      document.getElementById('btn-stop').classList.add('hidden');
+      return;
+    }
+
+    currentRunId = resp.run_id;
+    setStatus(`${resp.total_tests} tests generated — launching…`);
+    openStream(currentRunId);
+
+  } catch (err) {
+    setStatus('Network error: ' + err.message, true);
+    document.getElementById('btn-run').disabled  = false;
+    document.getElementById('btn-stop').classList.add('hidden');
+  }
+}
+
+async function stopRun() {
+  if (!currentRunId) return;
+  await api(`/api/playwright/stop/${currentRunId}`, { method: 'POST' });
+  setStatus('Stopping…');
+}
+
+function downloadReport(runId) {
+  const id = runId || currentRunId;
+  if (!id) return;
+  window.open(`/api/playwright/runs/${id}/report`, '_blank');
+}
+
+async function deleteRun(runId) {
+  if (!confirm(`Delete Run #${runId}? This cannot be undone.`)) return;
+  await api(`/api/playwright/runs/${runId}`, { method: 'DELETE' });
+  if (currentRunId === runId) {
+    currentRunId = null;
+    testState = {};
+    selectedTcId = null;
+    renderTestList();
+    document.getElementById('detail-panel').innerHTML = '';
+    setStatus('Run deleted');
+    updateScoreBar(0, 0, 0);
+  }
+  refreshPastRuns();
+}
+
+function onRunDone() {
+  document.getElementById('btn-run').disabled  = false;
+  document.getElementById('btn-stop').classList.add('hidden');
+  const pass  = Object.values(testState).filter(t => t.overall === 'PASS').length;
+  const fail  = Object.values(testState).filter(t => t.overall !== 'PASS' && t.overall !== 'pending').length;
+  const total = Object.keys(testState).length;
+  setStatus(`Done — ${pass}/${total} passed`);
+  updateScoreBar(pass, fail, total);
+  refreshPastRuns();
+}
+
+function updateScoreBar(pass, fail, total) {
+  document.getElementById('hdr-pass').textContent  = `${pass} pass`;
+  document.getElementById('hdr-fail').textContent  = `${fail} fail`;
+  document.getElementById('hdr-total').textContent = `${total} total`;
+  document.getElementById('score-bar').classList.remove('hidden');
+  document.getElementById('score-bar').style.display = 'flex';
+}
+
+// ── SSE stream ────────────────────────────────────────────────────────────────
+function openStream(runId) {
+  if (currentEs) { currentEs.close(); currentEs = null; }
+  const es = new EventSource(`/api/playwright/stream/${runId}`);
+  currentEs = es;
+
+  es.onmessage = e => {
+    const ev = JSON.parse(e.data);
+    handleEvent(ev);
+  };
+  es.onerror = () => {
+    es.close();
+    setStatus('Stream disconnected.');
+    document.getElementById('btn-run').disabled  = false;
+    document.getElementById('btn-stop').classList.add('hidden');
+  };
+}
+
+function handleEvent(ev) {
+  switch (ev.type) {
+    case 'pw_run_start':
+      ev.tests.forEach(t => {
+        testState[t.test_id] = {
+          status: 'pending', overall: 'pending',
+          name: t.name, ucName: t.use_case_name || '',
+          category: t.category || '',
+          turns: (t.turns || []).map((tu, idx) => ({ ...tu, turn: tu.turn || idx + 1, actual: null })),
+          turnVerdicts: [], criteriaResults: [], behaviorResults: [], summary: '',
+          passCriteria: t.pass_criteria || [],
+          behaviorExpectations: t.agent_behavior_expectations || [],
+          setupNotes: t.setup_notes || '',
+        };
+      });
+      document.getElementById('list-count').textContent = `0 / ${ev.total_tests}`;
+      renderTestList();
+      break;
+
+    case 'pw_test_start':
+      if (testState[ev.test_id]) {
+        testState[ev.test_id].status = 'running';
+        testState[ev.test_id].overall = 'running';
+        if (ev.category) testState[ev.test_id].category = ev.category;
+      } else {
+        testState[ev.test_id] = {
+          status: 'running', overall: 'running',
+          name: ev.name, ucName: ev.use_case_name || '',
+          category: ev.category || '',
+          turns: [], turnVerdicts: [], criteriaResults: [], behaviorResults: [], summary: '',
+          passCriteria: [], behaviorExpectations: [], setupNotes: '',
+        };
+      }
+      updateTestRow(ev.test_id);
+      if (selectedTcId === ev.test_id) renderDetail(ev.test_id);
+      break;
+
+    case 'pw_turn_user':
+      ensureTurn(ev.test_id, ev.turn, ev.message, null);
+      if (selectedTcId === ev.test_id) renderDetail(ev.test_id);
+      break;
+
+    case 'pw_turn_bot':
+      ensureTurnActual(ev.test_id, ev.turn, ev.message);
+      if (selectedTcId === ev.test_id) renderDetail(ev.test_id);
+      break;
+
+    case 'pw_eval_start':
+      if (testState[ev.test_id]) testState[ev.test_id].status = 'eval';
+      updateTestRow(ev.test_id);
+      if (selectedTcId === ev.test_id) renderDetail(ev.test_id);
+      break;
+
+    case 'pw_test_complete':
+      if (testState[ev.test_id]) {
+        const ts = testState[ev.test_id];
+        ts.status          = 'done';
+        ts.overall         = ev.overall;
+        ts.summary         = ev.summary;
+        ts.turnVerdicts    = ev.turn_verdicts || [];
+        ts.criteriaResults = ev.criteria_results || [];
+        ts.behaviorResults = ev.behavior_results || [];
+        if (ev.category) ts.category = ev.category;
+        if (ev.turns && ev.turns.length) ts.turns = ev.turns;
+      }
+      updateTestRow(ev.test_id);
+      if (selectedTcId === ev.test_id) renderDetail(ev.test_id);
+      updateListCount();
+      break;
+
+    case 'pw_otp_needed':
+      otpWaitingTestId = ev.test_id;
+      setStatus(`OTP needed for ${ev.test_id} — enter it in the test panel`);
+      selectTest(ev.test_id);
+      document.getElementById('dp-otp-overlay').classList.remove('hidden');
+      document.getElementById('otp-input').value = '';
+      document.getElementById('otp-status').textContent = '';
+      document.getElementById('otp-input').focus();
+      break;
+
+    case 'pw_otp_received':
+      if (otpWaitingTestId === ev.test_id) {
+        otpWaitingTestId = null;
+        document.getElementById('dp-otp-overlay').classList.add('hidden');
+        setStatus(`OTP accepted — resuming ${ev.test_id}…`);
+      }
+      break;
+
+    case 'pw_done':
+      onRunDone();
+      otpWaitingTestId = null;
+      document.getElementById('dp-otp-overlay').classList.add('hidden');
+      if (currentEs) { currentEs.close(); currentEs = null; }
+      break;
+
+    case 'error':
+      setStatus(ev.message, true);
+      break;
+  }
+}
+
+// ── Turn helpers ──────────────────────────────────────────────────────────────
+function ensureTurn(tcId, turn, user, actual) {
+  if (!testState[tcId]) return;
+  const ts = testState[tcId];
+  const existing = ts.turns.find(t => t.turn === turn);
+  if (existing) {
+    if (user   !== null) existing.user   = user;
+    if (actual !== null) existing.actual = actual;
+  } else {
+    ts.turns.push({ turn, user: user || '', expected: '', actual });
+  }
+}
+function ensureTurnActual(tcId, turn, actual) {
+  if (!testState[tcId]) return;
+  const ts = testState[tcId];
+  const existing = ts.turns.find(t => t.turn === turn);
+  if (existing) existing.actual = actual;
+  else ts.turns.push({ turn, user: '', expected: '', actual });
+}
+
+// ── Test list rendering ───────────────────────────────────────────────────────
+function renderTestList() {
+  const el = document.getElementById('test-list');
+  document.getElementById('list-empty').classList.add('hidden');
+  el.querySelectorAll('.test-row').forEach(r => r.remove());
+  el.insertAdjacentHTML('beforeend', Object.entries(testState).map(([id]) => testRowHtml(id)).join(''));
+}
+
+function testRowHtml(tcId) {
+  const ts  = testState[tcId];
+  const dot = overallDotClass(ts.overall);
+  const sel = tcId === selectedTcId ? ' selected' : '';
+  const catBadge = ts.category ? `<span class="text-gray-400" style="font-size:9px;text-transform:uppercase;letter-spacing:0.4px">${escHtml(ts.category)}</span>` : '';
+  const sub = [ts.ucName, ts.category ? ts.category : ''].filter(Boolean).join(' · ');
+  return `
+    <div id="row-${tcId}" class="test-row${sel}" onclick="selectTest('${tcId}')">
+      <span class="dot ${dot}"></span>
+      <div class="flex-1 min-w-0">
+        <p class="font-medium text-gray-800 truncate" style="font-size:11px">${escHtml(ts.name)}</p>
+        <p class="text-gray-400 truncate" style="font-size:10px">${escHtml(sub)}</p>
+      </div>
+      ${overallBadgeHtml(ts.overall)}
+    </div>`;
+}
+
+function updateTestRow(tcId) {
+  const el = document.getElementById(`row-${tcId}`);
+  if (el) el.outerHTML = testRowHtml(tcId);
+}
+
+function updateListCount() {
+  const done  = Object.values(testState).filter(t => t.status === 'done').length;
+  const total = Object.keys(testState).length;
+  document.getElementById('list-count').textContent = `${done} / ${total}`;
+}
+
+// ── Detail pane ───────────────────────────────────────────────────────────────
+function selectTest(tcId) {
+  selectedTcId = tcId;
+  document.querySelectorAll('.test-row').forEach(r => r.classList.remove('selected'));
+  const row = document.getElementById(`row-${tcId}`);
+  if (row) row.classList.add('selected');
+  renderDetail(tcId);
+}
+
+function renderDetail(tcId) {
+  const ts = testState[tcId];
+  if (!ts) return;
+  document.getElementById('detail-empty').classList.add('hidden');
+  document.getElementById('detail-pane').classList.remove('hidden');
+
+  document.getElementById('dp-name').textContent   = ts.name;
+  document.getElementById('dp-ucname').textContent = ts.ucName ? `Agent: ${ts.ucName}` : '';
+  document.getElementById('dp-dot').className  = `dot ${overallDotClass(ts.overall)}`;
+  document.getElementById('dp-badge').outerHTML =
+    `<span id="dp-badge" class="badge ${overallBadgeClass(ts.overall)}">${ts.overall || 'pending'}</span>`;
+
+  const sumWrap = document.getElementById('dp-summary-wrap');
+  if (ts.summary) {
+    sumWrap.classList.remove('hidden');
+    document.getElementById('dp-summary').textContent = ts.summary;
+    sumWrap.style.borderColor = ts.overall === 'PASS' ? 'var(--success-bd)'
+                              : ts.overall === 'FAIL' ? 'var(--error-bd)' : 'var(--border)';
+    sumWrap.style.background  = ts.overall === 'PASS' ? 'var(--success-bg)'
+                              : ts.overall === 'FAIL' ? 'var(--error-bg)' : 'var(--surface-2)';
+  } else {
+    sumWrap.classList.add('hidden');
+  }
+
+  const turnsEl = document.getElementById('dp-turns');
+  const emptyEl = document.getElementById('dp-turns-empty');
+  if (!ts.turns.length) {
+    turnsEl.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+  } else {
+    emptyEl.classList.add('hidden');
+    const verdictMap = {};
+    (ts.turnVerdicts || []).forEach(v => { verdictMap[v.turn] = v; });
+
+    turnsEl.innerHTML = ts.turns.map(t => {
+      const v       = verdictMap[t.turn];
+      const verdict = v ? v.verdict : '';
+      const reason  = v ? v.reason  : '';
+
+      const userHtml = `
+        <div class="turn-user p-2.5 text-xs fade-in">
+          <p class="text-gray-400 font-semibold mb-0.5" style="font-size:10px">Turn ${t.turn} · User</p>
+          <p class="text-gray-800" style="font-size:12px">${escHtml(t.user || '')}</p>
+        </div>`;
+
+      const expectedHtml = t.expected ? `
+        <div class="px-2.5 py-1 text-xs text-gray-500 italic" style="border-left:3px solid #e5e7eb;margin-left:4px;font-size:10px">
+          Expected: ${escHtml(t.expected)}
+        </div>` : '';
+
+      let actualHtml = '';
+      if (t.actual !== null && t.actual !== undefined) {
+        const vColor = verdict === 'PASS' ? 'var(--success)'
+                     : verdict === 'FAIL' ? 'var(--error)' : 'var(--success)';
+        actualHtml = `
+          <div class="turn-bot p-2.5 text-xs fade-in" ${verdict ? `style="border-left-color:${vColor}"` : ''}>
+            <div class="flex items-center justify-between mb-0.5">
+              <p class="text-gray-400 font-semibold" style="font-size:10px">Bot</p>
+              ${verdict ? `<span class="badge ${verdict === 'PASS' ? 'badge-pass' : 'badge-fail'}">${verdict}</span>` : ''}
+            </div>
+            <p class="text-gray-800 whitespace-pre-wrap" style="font-size:12px">${escHtml(t.actual || '(no response)')}</p>
+            ${reason ? `<p class="text-gray-400 mt-1 italic" style="font-size:10px">${escHtml(reason)}</p>` : ''}
+          </div>`;
+      } else {
+        actualHtml = `<div class="text-xs text-gray-400 px-2 py-1 italic" style="font-size:10px">Waiting for bot response…</div>`;
+      }
+
+      return `<div class="space-y-1 mb-2.5">${userHtml}${expectedHtml}${actualHtml}</div>`;
+    }).join('');
+  }
+
+  const crWrap  = document.getElementById('dp-criteria-wrap');
+  const crEl    = document.getElementById('dp-criteria');
+  if (ts.criteriaResults && ts.criteriaResults.length) {
+    crWrap.classList.remove('hidden');
+    crEl.innerHTML = ts.criteriaResults.map(cr => `
+      <div class="flex items-start gap-2 text-xs px-2.5 py-1.5 rounded-md ${cr.verdict === 'PASS' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}">
+        <span class="font-bold shrink-0 mt-0.5 ${cr.verdict === 'PASS' ? 'text-green-600' : 'text-red-600'}">${cr.verdict === 'PASS' ? '✓' : '✗'}</span>
+        <div>
+          <p class="${cr.verdict === 'PASS' ? 'text-green-800' : 'text-red-800'}" style="font-size:11px">${escHtml(cr.criterion)}</p>
+          ${cr.reason ? `<p class="opacity-70 mt-0.5" style="font-size:10px">${escHtml(cr.reason)}</p>` : ''}
+        </div>
+      </div>`).join('');
+  } else if (ts.passCriteria && ts.passCriteria.length && ts.overall === 'pending') {
+    crWrap.classList.remove('hidden');
+    crEl.innerHTML = ts.passCriteria.map(c => `
+      <div class="flex items-start gap-2 text-xs px-2.5 py-1.5 rounded-md bg-gray-50 border border-gray-200">
+        <span class="font-bold text-gray-400 shrink-0 mt-0.5">·</span>
+        <p class="text-gray-600" style="font-size:11px">${escHtml(c)}</p>
+      </div>`).join('');
+  } else {
+    crWrap.classList.add('hidden');
+  }
+
+  // ── Behavior expectations (rendered after criteria) ───────────────────────
+  let bhEl = document.getElementById('dp-behavior');
+  if (!bhEl) {
+    const host = crWrap && crWrap.parentNode ? crWrap.parentNode : null;
+    if (host) {
+      const wrap = document.createElement('div');
+      wrap.id = 'dp-behavior-wrap';
+      wrap.className = 'mt-2 space-y-1';
+      wrap.innerHTML = `<p class="text-gray-400 font-semibold mb-1" style="font-size:10px;text-transform:uppercase;letter-spacing:0.4px">Agent behavior expectations</p><div id="dp-behavior" class="space-y-1"></div>`;
+      host.insertBefore(wrap, crWrap.nextSibling);
+      bhEl = document.getElementById('dp-behavior');
+    }
+  }
+  const bhWrap = document.getElementById('dp-behavior-wrap');
+  if (bhEl && bhWrap) {
+    if (ts.behaviorResults && ts.behaviorResults.length) {
+      bhWrap.classList.remove('hidden');
+      bhEl.innerHTML = ts.behaviorResults.map(br => `
+        <div class="flex items-start gap-2 text-xs px-2.5 py-1.5 rounded-md ${br.verdict === 'PASS' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}">
+          <span class="font-bold shrink-0 mt-0.5 ${br.verdict === 'PASS' ? 'text-green-600' : 'text-red-600'}">${br.verdict === 'PASS' ? '✓' : '✗'}</span>
+          <div>
+            <p class="${br.verdict === 'PASS' ? 'text-green-800' : 'text-red-800'}" style="font-size:11px">${escHtml(br.expectation || '')}</p>
+            ${br.reason ? `<p class="opacity-70 mt-0.5" style="font-size:10px">${escHtml(br.reason)}</p>` : ''}
+          </div>
+        </div>`).join('');
+    } else if (ts.behaviorExpectations && ts.behaviorExpectations.length && ts.overall === 'pending') {
+      bhWrap.classList.remove('hidden');
+      bhEl.innerHTML = ts.behaviorExpectations.map(b => `
+        <div class="flex items-start gap-2 text-xs px-2.5 py-1.5 rounded-md bg-gray-50 border border-gray-200">
+          <span class="font-bold text-gray-400 shrink-0 mt-0.5">·</span>
+          <p class="text-gray-600" style="font-size:11px">${escHtml(b)}</p>
+        </div>`).join('');
+    } else {
+      bhWrap.classList.add('hidden');
+    }
+  }
+}
+
+// ── Past runs ─────────────────────────────────────────────────────────────────
+function renderPastRuns(runs) {
+  const el = document.getElementById('past-runs');
+  if (!runs.length) {
+    el.innerHTML = '<div class="text-xs text-gray-400 py-3 text-center">No runs yet.</div>';
+    return;
+  }
+  el.innerHTML = runs.map(r => {
+    const pass  = (r.results || []).filter(x => x.overall === 'PASS').length;
+    const total = r.total_tests || 0;
+    const statusColor = r.status === 'done' && pass === total ? 'var(--success)'
+                      : r.status === 'running' ? 'var(--brand)' : 'var(--error)';
+    const isActive = r.id === currentRunId;
+    return `
+      <div class="run-row${isActive ? ' active-run' : ''}" onclick="loadPastRun(${r.id})">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5">
+            <span class="font-semibold text-gray-700" style="font-size:10px">Run #${r.id}</span>
+            <span class="badge badge-${r.mode === 'headless' ? 'pending' : 'eval'}" style="font-size:9px;padding:1px 4px">${r.mode}</span>
+          </div>
+          <p class="text-gray-400" style="font-size:9px">${fmtTime(r.started_at)}</p>
+        </div>
+        <div class="text-right shrink-0" style="display:flex;align-items:center;gap:6px">
+          <div>
+            <p class="font-bold" style="font-size:11px;color:${statusColor}">${pass}/${total}</p>
+            <p style="font-size:9px;color:var(--text-4)">${r.status}</p>
+          </div>
+          ${r.status !== 'running' ? `<button onclick="event.stopPropagation();downloadReport(${r.id})" title="Download PDF report"
+            style="padding:3px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text-3);cursor:pointer;display:flex;align-items:center"
+            onmouseover="this.style.borderColor='var(--brand)';this.style.color='var(--brand)'"
+            onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-3)'">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v9m0 0l-3-3m3 3l3-3M3 13h10"/></svg>
+          </button><button onclick="event.stopPropagation();deleteRun(${r.id})" title="Delete run"
+            style="padding:3px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text-3);cursor:pointer;display:flex;align-items:center"
+            onmouseover="this.style.borderColor='var(--error)';this.style.color='var(--error)'"
+            onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-3)'">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 4h10M6 4V3h4v1M5 4v9h6V4"/></svg>
+          </button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function refreshPastRuns() {
+  const runs = await api('/api/playwright/runs');
+  renderPastRuns(runs);
+}
+
+async function loadPastRun(runId) {
+  if (currentEs) { currentEs.close(); currentEs = null; }
+  currentRunId = runId;
+
+  const run = await api(`/api/playwright/runs/${runId}`);
+  if (run.error) return;
+
+  testState    = {};
+  selectedTcId = null;
+  document.getElementById('detail-pane').classList.add('hidden');
+  document.getElementById('detail-empty').classList.remove('hidden');
+
+  (run.results || []).forEach(r => {
+    testState[r.test_id] = {
+      status: 'done', overall: r.overall,
+      name: r.name, ucName: r.use_case_name || '',
+      turns: r.turns || [],
+      turnVerdicts: [], criteriaResults: [], summary: r.summary || '',
+      passCriteria: [],
+    };
+  });
+
+  renderTestList();
+  updateListCount();
+
+  const pass  = Object.values(testState).filter(t => t.overall === 'PASS').length;
+  const fail  = Object.values(testState).filter(t => t.overall !== 'PASS').length;
+  const total = Object.keys(testState).length;
+  updateScoreBar(pass, fail, total);
+  setStatus(`Run #${runId} — ${pass}/${total} passed (${run.mode})`);
+
+  const runs = await api('/api/playwright/runs');
+  renderPastRuns(runs);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function overallDotClass(overall) {
+  if (overall === 'PASS')    return 'dot-pass';
+  if (overall === 'FAIL')    return 'dot-fail';
+  if (overall === 'ERROR')   return 'dot-error';
+  if (overall === 'running') return 'dot-running';
+  if (overall === 'eval')    return 'dot-eval';
+  return 'dot-pending';
+}
+function overallBadgeClass(overall) {
+  if (overall === 'PASS')    return 'badge-pass';
+  if (overall === 'FAIL')    return 'badge-fail';
+  if (overall === 'ERROR')   return 'badge-error';
+  if (overall === 'running') return 'badge-running';
+  if (overall === 'eval')    return 'badge-eval';
+  return 'badge-pending';
+}
+function overallBadgeHtml(overall) {
+  if (!overall || overall === 'pending') return '';
+  return `<span class="badge ${overallBadgeClass(overall)}" style="font-size:9px">${overall}</span>`;
+}
+function escHtml(s) {
+  return String(s || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+{
+  "id": "TC-011",
+  "name": "User Moved to Different Country",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "I've moved to Germany and want to cancel my subscription",
+      "bot": "[ROUTE TO: Cx moved to diff country or signed up in wrong]"
+    }
+  ],
+  "tool_calls_made": {},
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "Bot routes to [Cx moved to diff country or signed up in wrong] on the first message",
+        "verdict": "PASS",
+        "reason": "The bot routes to [Cx moved to diff country or signed up in wrong] in its first message."
+      },
+      {
+        "criterion": "Bot does NOT ask for a cancellation reason before routing",
+        "verdict": "PASS",
+        "reason": "The bot does not ask for a cancellation reason before routing."
+      },
+      {
+        "criterion": "Routing happens without any preceding message asking for reason",
+        "verdict": "PASS",
+        "reason": "There is no preceding message from the bot asking for a reason before routing."
+      }
+    ],
+    "overall": "PASS",
+    "summary": "All criteria are clearly satisfied: the bot routes immediately without asking for a cancellation reason.",
+    "criteria": [
+      "Bot routes to [Cx moved to diff country or signed up in wrong] on the first message",
+      "Bot does NOT ask for a cancellation reason before routing",
+      "Routing happens without any preceding message asking for reason"
+    ]
+  },
+  "timestamp": "2026-05-13T18:29:20.754752"
+}

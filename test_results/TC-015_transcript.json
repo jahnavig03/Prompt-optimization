@@ -1,0 +1,70 @@
+{
+  "id": "TC-015",
+  "name": "Pause Offer Presented and Accepted (DAZN subscription)",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "Cancel my DAZN subscription",
+      "bot": "I'm sorry to hear you'd like to cancel your subscription. Could you share the reason for your cancellation? Your feedback helps us improve your experience."
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "Taking a break for a few months",
+      "bot": "I understand your request. Instead of cancelling, we recommend trying our Pause feature. This lets you pause your subscription at no cost and reactivate it whenever you choose. It's a great way to keep your account active without losing your current benefits.\n\nWould you like to explore this option?"
+    },
+    {
+      "type": "bot_message",
+      "turn": 3,
+      "user": "No thanks to the offer, but tell me about the pause",
+      "bot": "Of course! The Pause feature allows you to temporarily stop your DAZN subscription without cancelling it completely. During the pause period, you won\u2019t be charged, and your access will be suspended. Once the pause ends, your subscription will automatically reactivate, and you\u2019ll be charged on your usual billing date. This way, you keep your account and preferences, and you don\u2019t lose any benefits.\n\nWould you like to try pausing your subscription, or would you prefer to continue with cancellation?"
+    },
+    {
+      "type": "bot_message",
+      "turn": 4,
+      "user": "Yes, pause it for 2 months",
+      "bot": "Perfect! By pausing your account today, you'll continue to have access to DAZN until your next payment date, when your pause period will begin.\n\nWe won't take any payments during the pause period. Once the pause ends on your selected date, your account will automatically reactivate, and you'll be charged on the same date. You'll regain access to all of DAZN's amazing content.\n\nIs there anything else I can help you with today?"
+    }
+  ],
+  "tool_calls_made": {},
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "Pause offer is presented (mentions pause feature, no cost, reactivate whenever)",
+        "verdict": "PASS",
+        "reason": "The bot mentions the pause feature, that it is at no cost, and that the user can reactivate whenever they choose."
+      },
+      {
+        "criterion": "Bot asks if user wants to explore the pause option",
+        "verdict": "PASS",
+        "reason": "The bot explicitly asks 'Would you like to explore this option?' after presenting the pause feature."
+      },
+      {
+        "criterion": "After user shows interest, bot asks how long they'd like to pause",
+        "verdict": "FAIL",
+        "reason": "The bot does not ask the user how long they would like to pause after the user shows interest; it only explains the feature and asks if the user wants to pause or cancel."
+      },
+      {
+        "criterion": "After user says 2 months, bot confirms pause details (mentions nextchargedate 2026-06-01 and pause end date)",
+        "verdict": "FAIL",
+        "reason": "The bot does not mention the next charge date (2026-06-01) or the specific pause end date after the user requests a 2-month pause."
+      },
+      {
+        "criterion": "cancelProduct is NOT called when user accepts pause",
+        "verdict": "PASS",
+        "reason": "No tool calls were made, including cancelProduct, after the user accepted the pause."
+      }
+    ],
+    "overall": "FAIL",
+    "summary": "The bot presented and offered the pause feature correctly, but failed to ask for the pause duration and did not confirm the required pause details after the user specified 2 months.",
+    "criteria": [
+      "Pause offer is presented (mentions pause feature, no cost, reactivate whenever)",
+      "Bot asks if user wants to explore the pause option",
+      "After user shows interest, bot asks how long they'd like to pause",
+      "After user says 2 months, bot confirms pause details (mentions nextchargedate 2026-06-01 and pause end date)",
+      "cancelProduct is NOT called when user accepts pause"
+    ]
+  },
+  "timestamp": "2026-05-13T18:30:25.266984"
+}

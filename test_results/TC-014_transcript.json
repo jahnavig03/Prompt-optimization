@@ -1,0 +1,70 @@
+{
+  "id": "TC-014",
+  "name": "Retention Offer Accepted \u2014 No Cancellation",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "I want to cancel my subscription",
+      "bot": "To proceed with your cancellation, you'll need to be signed in to your DAZN account. You can sign in here: <a href=\"https://dazn.com/en-AU/account/content/DAZN/signup?signin=true&page=emailDetails\" target=\"_blank\">DAZN | Sign in</a>\n\nOnce you're signed in, please reply 'I'm signed in' and I'll continue."
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "It's too expensive",
+      "bot": "To proceed with your cancellation, you'll need to be signed in to your DAZN account. You can sign in here: <a href=\"https://dazn.com/en-AU/account/content/DAZN/signup?signin=true&page=emailDetails\" target=\"_blank\">DAZN | Sign in</a>\n\nOnce you're signed in, please reply 'I'm signed in' and I'll continue."
+    },
+    {
+      "type": "bot_message",
+      "turn": 3,
+      "user": "Yes, I'd like that",
+      "bot": "To proceed with your cancellation, you'll need to be signed in to your DAZN account. You can sign in here: <a href=\"https://dazn.com/en-AU/account/content/DAZN/signup?signin=true&page=emailDetails\" target=\"_blank\">DAZN | Sign in</a>\n\nOnce you're signed in, please reply 'I'm signed in' and I'll continue."
+    }
+  ],
+  "tool_calls_made": {},
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "getCancelandOfferDetails is called and cancelOfferAvailable=true scenario is handled",
+        "verdict": "FAIL",
+        "reason": "There is no evidence in the transcript or tool calls that getCancelandOfferDetails was called or that any offer scenario was handled."
+      },
+      {
+        "criterion": "cancelOfferMessage is shown verbatim (mentions 1 month free / payment paused 30 days)",
+        "verdict": "FAIL",
+        "reason": "The transcript does not contain any message mentioning a 1 month free offer or payment paused for 30 days."
+      },
+      {
+        "criterion": "Bot asks exactly 'Would you like me to set that up for you?'",
+        "verdict": "FAIL",
+        "reason": "The bot never asks 'Would you like me to set that up for you?' in any turn."
+      },
+      {
+        "criterion": "Bot provides the DAZN Subscriptions link after user accepts",
+        "verdict": "FAIL",
+        "reason": "The bot provides the DAZN sign-in link repeatedly, but not specifically after the user accepts an offer, nor is it the Subscriptions link in the context of an accepted offer."
+      },
+      {
+        "criterion": "cancelProduct and cancelProductImmediate are NOT called",
+        "verdict": "PASS",
+        "reason": "Neither cancelProduct nor cancelProductImmediate appear in the tool calls."
+      },
+      {
+        "criterion": "Bot does NOT proceed to cancellation steps after offer is accepted",
+        "verdict": "PASS",
+        "reason": "The bot does not proceed to cancellation steps after the user accepts, as it keeps asking the user to sign in."
+      }
+    ],
+    "overall": "FAIL",
+    "summary": "The bot failed to handle the cancellation offer scenario and did not meet most of the required criteria.",
+    "criteria": [
+      "getCancelandOfferDetails is called and cancelOfferAvailable=true scenario is handled",
+      "cancelOfferMessage is shown verbatim (mentions 1 month free / payment paused 30 days)",
+      "Bot asks exactly 'Would you like me to set that up for you?'",
+      "Bot provides the DAZN Subscriptions link after user accepts",
+      "cancelProduct and cancelProductImmediate are NOT called",
+      "Bot does NOT proceed to cancellation steps after offer is accepted"
+    ]
+  },
+  "timestamp": "2026-05-13T18:30:08.407677"
+}

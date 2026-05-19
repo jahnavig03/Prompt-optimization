@@ -1,0 +1,58 @@
+{
+  "id": "TC-018",
+  "name": "Pre-Cancellation Tool Failure \u2014 Route to Chat With An Agent",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "I want to cancel my subscription",
+      "bot": "I'm sorry to hear you'd like to cancel your subscription. Could you please share the reason for your cancellation? Your feedback helps us improve your experience."
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "I don't need it anymore",
+      "bot": "Thank you for letting me know. Just to understand a bit more, could you tell me what has changed or what led you to decide you no longer need your DAZN subscription? Your feedback is really valuable to us."
+    }
+  ],
+  "tool_calls_made": {},
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "getProductDetailsForCancel is called",
+        "verdict": "FAIL",
+        "reason": "The tool getProductDetailsForCancel is not called as per the tool_calls summary."
+      },
+      {
+        "criterion": "Bot says exactly: 'I want to make sure this is handled perfectly for you, so I'm bringing in one of our specialists to take care of this.'",
+        "verdict": "FAIL",
+        "reason": "The bot does not say this exact phrase anywhere in the transcript."
+      },
+      {
+        "criterion": "Bot routes to [Chat With An Agent]",
+        "verdict": "FAIL",
+        "reason": "[ROUTE TO: Chat With An Agent] does not appear in the bot's messages."
+      },
+      {
+        "criterion": "Bot does NOT reveal what tool failed or what the specialist will do",
+        "verdict": "PASS",
+        "reason": "The bot does not mention any tool failures or what the specialist will do."
+      },
+      {
+        "criterion": "No further cancellation steps are attempted after routing",
+        "verdict": "PASS",
+        "reason": "No routing occurs, so no further cancellation steps are attempted after routing."
+      }
+    ],
+    "overall": "FAIL",
+    "summary": "Most critical pass criteria are not met, including tool call, exact phrasing, and routing to an agent.",
+    "criteria": [
+      "getProductDetailsForCancel is called",
+      "Bot says exactly: 'I want to make sure this is handled perfectly for you, so I'm bringing in one of our specialists to take care of this.'",
+      "Bot routes to [Chat With An Agent]",
+      "Bot does NOT reveal what tool failed or what the specialist will do",
+      "No further cancellation steps are attempted after routing"
+    ]
+  },
+  "timestamp": "2026-05-13T18:31:18.291456"
+}

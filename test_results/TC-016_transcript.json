@@ -1,0 +1,132 @@
+{
+  "id": "TC-016",
+  "name": "Non-DAZN Subscription (RallyTV) \u2014 Skip Pause Step",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "I'd like to cancel my RallyTV subscription",
+      "bot": "To help with your cancellation request, could you please confirm if you are signed in to your DAZN account? If not, please sign in here: <a href=\"https://dazn.com/en-AU/account/content/DAZN/signup?signin=true&page=emailDetails\" target=\"_blank\">DAZN | Sign in</a>\n\nOnce you're signed in, please reply \"I'm signed in\" and I'll continue."
+    },
+    {
+      "type": "tool_calls",
+      "turn": 2,
+      "tool_calls": [
+        {
+          "tool": "getProductDetailsForCancel",
+          "args": "{\"productGroup\":\"RallyTV\"}",
+          "result": {
+            "productStatus": "ActivePaid",
+            "zuoraStatus": "Active",
+            "inFirst14Days": false,
+            "inFreeTrial": false,
+            "termType": "EVERGREEN",
+            "cancellationOptionType": "AUTO_RENEWAL_OFF",
+            "cancellationOptionMessage": "Your subscription will be cancelled after a 30-day notice period.",
+            "nextChargeDate": "2026-06-01",
+            "cancellableOnDate": "2026-07-01",
+            "subscriptionEndDate": "2026-07-01",
+            "cancelPeriodMessage": "30-day notice period applies.",
+            "isPenaltyApplied": false,
+            "penaltyAmount": 0,
+            "penaltyAmountCurrencyCode": "GBP",
+            "ratePlanName": "RallyTV Monthly",
+            "userSubscriptionName": "RallyTV Monthly",
+            "ultimateRatePlan": false
+          }
+        }
+      ]
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "I don't use it enough",
+      "bot": "I'm sorry to hear you'd like to cancel your RallyTV Monthly plan. Could you share the reason for your cancellation? Your feedback helps us improve your experience."
+    },
+    {
+      "type": "tool_calls",
+      "turn": 3,
+      "tool_calls": [
+        {
+          "tool": "getCancelandOfferDetails",
+          "args": "{\"termType\":\"EVERGREEN\"}",
+          "result": {
+            "cancelOfferAvailable": false,
+            "cancelOfferMessage": "",
+            "cancellationOptionType": "AUTO_RENEWAL_OFF",
+            "cancellationOptionMessage": "Your subscription will be cancelled after a 30-day notice period.",
+            "isWatched15Mins": false,
+            "inFirst14Days": false,
+            "inFreeTrial": false
+          }
+        }
+      ]
+    },
+    {
+      "type": "bot_message",
+      "turn": 3,
+      "user": "No thanks",
+      "bot": "If I cancel your subscription today, your 30-day notice period will begin. During this time, you can still enjoy full access to DAZN content without any interruptions.\n\nIf applicable, you will make a final prorated payment on your scheduled billing date, 2026-06-01. This payment will be lower than your usual monthly charge, as it covers the remaining days of the notice period.\n\nWould you like me to go ahead and cancel now?"
+    },
+    {
+      "type": "tool_calls",
+      "turn": 4,
+      "tool_calls": [
+        {
+          "tool": "cancelProduct",
+          "args": "{\"isUserComingFromDelete\":\"false\"}",
+          "result": {
+            "message": "The request has been successfully submitted for processing",
+            "status": "success",
+            "cancellableOnDate": "2026-07-01",
+            "nextChargeDate": "2026-06-01"
+          }
+        }
+      ]
+    },
+    {
+      "type": "bot_message",
+      "turn": 4,
+      "user": "Yes cancel it",
+      "bot": "Your subscription has been cancelled \u2014 auto-renewal is now off. You'll retain access until 2026-07-01. A final prorated payment covering the period up to that date will be charged on 2026-06-01.\n\nIs there anything else I can help you with today?"
+    }
+  ],
+  "tool_calls_made": {
+    "getProductDetailsForCancel": 1,
+    "getCancelandOfferDetails": 1,
+    "cancelProduct": 1
+  },
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "Pause offer is NOT presented for RallyTV subscription",
+        "verdict": "PASS",
+        "reason": "No pause offer is mentioned or presented in any bot message."
+      },
+      {
+        "criterion": "Flow goes from retention offer check directly to cancellation impact (Step 7) without pause step",
+        "verdict": "PASS",
+        "reason": "After checking for retention offers, the bot immediately explains the cancellation impact without mentioning or offering a pause."
+      },
+      {
+        "criterion": "Cancellation impact message (30-day notice) is shown with nextChargeDate",
+        "verdict": "PASS",
+        "reason": "The bot clearly states the 30-day notice and provides the nextChargeDate (2026-06-01) in the cancellation impact message."
+      },
+      {
+        "criterion": "cancelProduct is called after user confirms",
+        "verdict": "PASS",
+        "reason": "The user confirms cancellation in Turn 4, and cancelProduct is called immediately after."
+      }
+    ],
+    "overall": "PASS",
+    "summary": "All criteria are fully satisfied; the bot handled the RallyTV cancellation flow correctly without offering a pause and provided the required cancellation impact details.",
+    "criteria": [
+      "Pause offer is NOT presented for RallyTV subscription",
+      "Flow goes from retention offer check directly to cancellation impact (Step 7) without pause step",
+      "Cancellation impact message (30-day notice) is shown with nextChargeDate",
+      "cancelProduct is called after user confirms"
+    ]
+  },
+  "timestamp": "2026-05-13T18:30:46.883698"
+}

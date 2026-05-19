@@ -1,0 +1,329 @@
+[
+  {
+    "id": "TC-001",
+    "name": "Deceased account holder - immediate routing",
+    "conversation_script": [
+      "My father passed away, I need to cancel his DAZN subscription."
+    ],
+    "pass_criteria": [
+      "Bot routes immediately to [Deceased Customer].",
+      "Bot does NOT send any other text, condolences, or questions."
+    ]
+  },
+  {
+    "id": "TC-002",
+    "name": "Customer moved to another country - immediate routing",
+    "conversation_script": [
+      "I moved to France and want to cancel my DAZN subscription."
+    ],
+    "pass_criteria": [
+      "Bot routes immediately to [Cx moved to diff country or signed up in wrong].",
+      "Bot does NOT send any other text or questions."
+    ]
+  },
+  {
+    "id": "TC-003",
+    "name": "Customer not signed in - sign-in prompt",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription."
+    ],
+    "pass_criteria": [
+      "Bot checks userDetails and detects missing email or daznId.",
+      "Bot provides the sign-in URL as a hyperlink.",
+      "Bot asks customer to reply once signed in.",
+      "Bot does NOT proceed to any subscription or cancellation steps before sign-in is confirmed."
+    ]
+  },
+  {
+    "id": "TC-004",
+    "name": "Single active subscription - skip selection",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription."
+    ],
+    "pass_criteria": [
+      "Bot confirms customer is signed in (email and daznId present).",
+      "Bot calls getProductDetailsForCancel before any other cancellation logic.",
+      "Bot proceeds automatically without asking customer to select a subscription."
+    ]
+  },
+  {
+    "id": "TC-005",
+    "name": "Multiple active subscriptions - prompt for selection",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription."
+    ],
+    "pass_criteria": [
+      "Bot confirms customer is signed in.",
+      "Bot calls getProductDetailsForCancel before any other cancellation logic.",
+      "Bot lists each ActivePaid subscription using subscriptionName.",
+      "Bot asks which subscription the customer wants to cancel."
+    ]
+  },
+  {
+    "id": "TC-006",
+    "name": "getProductDetailsForCancel tool failure - escalation",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription."
+    ],
+    "pass_criteria": [
+      "Bot attempts to call getProductDetailsForCancel as the first step.",
+      "If the tool fails, bot says: 'I want to make sure this is handled perfectly for you, so I'm bringing in one of our specialists to take care of this.'",
+      "Bot routes to [Chat With An Agent]."
+    ]
+  },
+  {
+    "id": "TC-007",
+    "name": "Subscription in ActiveGrace - silent routing",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription."
+    ],
+    "pass_criteria": [
+      "Bot calls getProductDetailsForCancel first.",
+      "If productStatus is 'ActiveGrace', bot routes silently to [Customer missed a payment] with no message to customer."
+    ]
+  },
+  {
+    "id": "TC-008",
+    "name": "Subscription in ActivePaused - inform and confirm intent",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription."
+    ],
+    "pass_criteria": [
+      "Bot calls getProductDetailsForCancel first.",
+      "If productStatus is 'ActivePaused', bot informs customer their subscription is paused.",
+      "Bot asks if they still want to cancel."
+    ]
+  },
+  {
+    "id": "TC-009",
+    "name": "Subscription Frozen or Expired - inform ended",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription."
+    ],
+    "pass_criteria": [
+      "Bot calls getProductDetailsForCancel first.",
+      "If productStatus is 'Frozen' or 'Expired', bot tells customer the subscription has ended and there will be no further charges."
+    ]
+  },
+  {
+    "id": "TC-010",
+    "name": "Subscription already cancelled - inform and offer re-enable",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription."
+    ],
+    "pass_criteria": [
+      "Bot calls getProductDetailsForCancel first.",
+      "If zuoraStatus is 'Cancelled', bot tells customer auto-renewal is already off.",
+      "Bot offers to re-enable the subscription."
+    ]
+  },
+  {
+    "id": "TC-011",
+    "name": "Ask for cancellation reason - open-ended, not generic",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription.",
+      "I just want to cancel."
+    ],
+    "pass_criteria": [
+      "Bot asks for a cancellation reason before proceeding to any offer or impact step.",
+      "If customer replies with 'I just want to cancel' or equivalent, bot re-asks with an open-ended question.",
+      "Bot does NOT list example reasons."
+    ]
+  },
+  {
+    "id": "TC-012",
+    "name": "Streaming/buffering issue - route to TS",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription.",
+      "The video keeps buffering and the quality is poor."
+    ],
+    "pass_criteria": [
+      "Bot asks for cancellation reason.",
+      "If customer mentions streaming, buffering, quality, app, or device problem, bot routes to [TS Buffering and Poor Video Quality]."
+    ]
+  },
+  {
+    "id": "TC-013",
+    "name": "Refund request as reason - answer policy, do not cancel",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription.",
+      "I want a refund."
+    ],
+    "pass_criteria": [
+      "Bot asks for cancellation reason.",
+      "If customer gives refund request as reason, bot answers with refund policy.",
+      "Bot does NOT proceed with cancellation."
+    ]
+  },
+  {
+    "id": "TC-014",
+    "name": "Retention offer available - present and handle acceptance",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription.",
+      "Because I don't use it much.",
+      "Yes, I'd like to accept the offer."
+    ],
+    "pass_criteria": [
+      "Bot asks for cancellation reason.",
+      "Bot calls getCancelandOfferDetails after getProductDetailsForCancel.",
+      "If cancelOfferAvailable is true, bot shows cancelOfferMessage verbatim.",
+      "Bot asks 'Would you like me to set that up for you?'",
+      "If customer accepts, bot provides DAZN subscription management link.",
+      "Bot does NOT proceed with cancellation."
+    ]
+  },
+  {
+    "id": "TC-015",
+    "name": "Retention offer not available - skip offer",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription.",
+      "I don't watch sports anymore."
+    ],
+    "pass_criteria": [
+      "Bot asks for cancellation reason.",
+      "Bot calls getCancelandOfferDetails after getProductDetailsForCancel.",
+      "If cancelOfferAvailable is false, bot does NOT present any retention offer."
+    ]
+  },
+  {
+    "id": "TC-016",
+    "name": "FREE_TRIAL_PLAN - skip retention offer, show message",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription.",
+      "I don't need it anymore."
+    ],
+    "pass_criteria": [
+      "Bot asks for cancellation reason.",
+      "If cancellationOptionType is 'FREE_TRIAL_PLAN', bot skips retention offer entirely.",
+      "Bot shows cancellationOptionMessage verbatim."
+    ]
+  },
+  {
+    "id": "TC-017",
+    "name": "Pause offer allowed - present and handle pause",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription.",
+      "I'm having financial difficulties.",
+      "Can I pause instead?",
+      "I want to pause for 2 months."
+    ],
+    "pass_criteria": [
+      "Bot asks for cancellation reason.",
+      "If financial hardship is mentioned, bot presents pause and retention offers before proceeding to cancellation.",
+      "If pauseDetails.pause is 'Allowed' for DAZN productGroup, bot offers pause before cancellation impact.",
+      "If customer wants to pause, bot asks for desired duration.",
+      "Bot validates duration against pausemaxdate.",
+      "Bot confirms pause details including nextchargedate."
+    ]
+  },
+  {
+    "id": "TC-018",
+    "name": "Pause offer not allowed for non-DAZN products",
+    "conversation_script": [
+      "I want to cancel my RallyTV subscription.",
+      "Can I pause it?"
+    ],
+    "pass_criteria": [
+      "Bot does NOT offer pause for RallyTV, FIBA, NationalLeagueTV, or NHL subscriptions."
+    ]
+  },
+  {
+    "id": "TC-019",
+    "name": "Cancellation impact - IMMEDIATE_NO_FEE (within 14 days)",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription.",
+      "I don't need it anymore.",
+      "Yes, please cancel now."
+    ],
+    "pass_criteria": [
+      "Bot asks for cancellation reason.",
+      "If cancellationOptionType is 'IMMEDIATE_NO_FEE', bot shows immediate cancellation message: 'access will end today'.",
+      "Bot does NOT mention 30-day notice, nextChargeDate, or prorated charge.",
+      "Bot asks 'Would you like me to go ahead and cancel now?' and waits for explicit confirmation.",
+      "On confirmation, bot calls cancelProductImmediate.",
+      "On success, bot confirms: 'Your plan is cancelled. You won't be charged again, and your access ends today.'",
+      "Bot does NOT mention subscriptionEndDate or nextChargeDate."
+    ]
+  },
+  {
+    "id": "TC-020",
+    "name": "Cancellation impact - 30-day notice with prorated charge",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription.",
+      "I don't need it anymore.",
+      "Yes, cancel it."
+    ],
+    "pass_criteria": [
+      "Bot asks for cancellation reason.",
+      "If cancellationOptionType is not 'IMMEDIATE_NO_FEE' or 'FREE_TRIAL_PLAN', bot shows 30-day notice message with nextChargeDate.",
+      "Bot mentions prorated final payment but does NOT state a specific monetary amount.",
+      "Bot asks 'Would you like me to go ahead and cancel now?' and waits for explicit confirmation.",
+      "On confirmation, bot calls cancelProduct.",
+      "On success, bot confirms cancellation with cancellableOnDate and mentions prorated charge on nextChargeDate."
+    ]
+  },
+  {
+    "id": "TC-021",
+    "name": "Cancellation declined - do not cancel",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription.",
+      "I don't need it anymore.",
+      "No, I changed my mind."
+    ],
+    "pass_criteria": [
+      "Bot asks for cancellation reason.",
+      "Bot asks for explicit confirmation before cancelling.",
+      "If customer declines, bot does NOT cancel and closes gracefully."
+    ]
+  },
+  {
+    "id": "TC-022",
+    "name": "Refund processed after cancellation - inform customer",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription.",
+      "I don't need it anymore.",
+      "Yes, cancel it."
+    ],
+    "pass_criteria": [
+      "Bot asks for cancellation reason.",
+      "Bot asks for explicit confirmation.",
+      "On cancellation, if refundProcessed is true in tool response, bot says: 'Your refund is successfully processed.'"
+    ]
+  },
+  {
+    "id": "TC-023",
+    "name": "Cancellation tool error - escalation",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription.",
+      "I don't need it anymore.",
+      "Yes, cancel it."
+    ],
+    "pass_criteria": [
+      "Bot asks for cancellation reason.",
+      "Bot asks for explicit confirmation.",
+      "If cancelProduct or cancelProductImmediate tool returns an error, bot says: 'I want to make sure this is handled perfectly for you, so I'm bringing in one of our specialists to take care of this.'",
+      "Bot routes to [Chat With An Agent]."
+    ]
+  },
+  {
+    "id": "TC-024",
+    "name": "Communication rules - one question per message",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription."
+    ],
+    "pass_criteria": [
+      "Bot never combines two questions in one response at any stage."
+    ]
+  },
+  {
+    "id": "TC-025",
+    "name": "No filler or internal details revealed",
+    "conversation_script": [
+      "I want to cancel my DAZN subscription."
+    ],
+    "pass_criteria": [
+      "Bot does NOT use filler phrases like 'please wait', 'one moment', etc., during tool calls.",
+      "Bot does NOT reveal step numbers, variable names, tool/workflow names, internal flags, or eligibility criteria in any message."
+    ]
+  }
+]

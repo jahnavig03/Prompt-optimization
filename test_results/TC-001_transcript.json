@@ -1,0 +1,112 @@
+{
+  "id": "TC-001",
+  "name": "Happy Path: Standard Cancellation (30-day notice, AUTO_RENEWAL_OFF)",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "I want to cancel my subscription",
+      "bot": "I'm sorry to hear you'd like to cancel your subscription. Could you share the reason for your cancellation? Your feedback helps us improve your experience."
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "I don't watch it anymore",
+      "bot": "Thank you for letting me know. Before we proceed, I have a special offer available for you: \n\nWould you like me to set that up for you?"
+    },
+    {
+      "type": "bot_message",
+      "turn": 3,
+      "user": "No thanks, I want to cancel",
+      "bot": "I understand your request. Instead of cancelling, we recommend trying our Pause feature. This lets you pause your subscription at no cost and reactivate it whenever you choose. It's a great way to keep your account active without losing your current benefits.\n\nWould you like to explore this option?"
+    },
+    {
+      "type": "bot_message",
+      "turn": 4,
+      "user": "Yes, go ahead",
+      "bot": "Great! How long would you like to pause for?"
+    }
+  ],
+  "tool_calls_made": {},
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "Bot does NOT ask user to sign in (user is already signed in)",
+        "verdict": "PASS",
+        "reason": "The bot does not ask the user to sign in at any point."
+      },
+      {
+        "criterion": "Bot does NOT ask user to choose a subscription (only one eligible)",
+        "verdict": "PASS",
+        "reason": "The bot does not ask the user to choose a subscription."
+      },
+      {
+        "criterion": "getProductDetailsForCancel tool is called (appears in tool call log)",
+        "verdict": "FAIL",
+        "reason": "getProductDetailsForCancel does not appear in the tool call log."
+      },
+      {
+        "criterion": "getCancelandOfferDetails tool is called after getProductDetailsForCancel",
+        "verdict": "FAIL",
+        "reason": "Neither tool is called according to the tool call log."
+      },
+      {
+        "criterion": "Bot asks for cancellation reason before presenting any offer or impact message",
+        "verdict": "PASS",
+        "reason": "The bot asks for the cancellation reason before presenting any offers."
+      },
+      {
+        "criterion": "Bot either presents a pause offer or retention offer before the cancellation confirmation",
+        "verdict": "PASS",
+        "reason": "The bot presents both a retention offer and a pause offer before cancellation confirmation."
+      },
+      {
+        "criterion": "30-day notice message is shown \u2014 mentions nextChargeDate (2026-06-01)",
+        "verdict": "FAIL",
+        "reason": "No 30-day notice message or mention of nextChargeDate is present in the transcript."
+      },
+      {
+        "criterion": "Bot asks 'Would you like me to go ahead and cancel now?' before executing cancellation",
+        "verdict": "FAIL",
+        "reason": "The bot does not ask this question before executing cancellation."
+      },
+      {
+        "criterion": "cancelProduct (not cancelProductImmediate) is called only after user says yes",
+        "verdict": "FAIL",
+        "reason": "cancelProduct is not called at all according to the tool call log."
+      },
+      {
+        "criterion": "Bot confirms cancellation with cancellableOnDate (2026-07-01) and mentions prorated charge on nextChargeDate",
+        "verdict": "FAIL",
+        "reason": "No confirmation with cancellableOnDate or mention of prorated charge is present."
+      },
+      {
+        "criterion": "Bot does NOT state a specific monetary amount for the prorated charge",
+        "verdict": "PASS",
+        "reason": "No specific monetary amount is mentioned in the transcript."
+      },
+      {
+        "criterion": "Bot does NOT send 'please wait' or filler messages during tool execution",
+        "verdict": "PASS",
+        "reason": "No filler or 'please wait' messages are present."
+      }
+    ],
+    "overall": "FAIL",
+    "summary": "Several required tool calls and key cancellation flow steps are missing, resulting in a failure to meet the pass criteria.",
+    "criteria": [
+      "Bot does NOT ask user to sign in (user is already signed in)",
+      "Bot does NOT ask user to choose a subscription (only one eligible)",
+      "getProductDetailsForCancel tool is called (appears in tool call log)",
+      "getCancelandOfferDetails tool is called after getProductDetailsForCancel",
+      "Bot asks for cancellation reason before presenting any offer or impact message",
+      "Bot either presents a pause offer or retention offer before the cancellation confirmation",
+      "30-day notice message is shown \u2014 mentions nextChargeDate (2026-06-01)",
+      "Bot asks 'Would you like me to go ahead and cancel now?' before executing cancellation",
+      "cancelProduct (not cancelProductImmediate) is called only after user says yes",
+      "Bot confirms cancellation with cancellableOnDate (2026-07-01) and mentions prorated charge on nextChargeDate",
+      "Bot does NOT state a specific monetary amount for the prorated charge",
+      "Bot does NOT send 'please wait' or filler messages during tool execution"
+    ]
+  },
+  "timestamp": "2026-05-13T18:27:31.476759"
+}

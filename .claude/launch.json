@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "prompt-lab",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["web_app.py"],
+      "port": 5001
+    }
+  ]
+}

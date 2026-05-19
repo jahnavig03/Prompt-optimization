@@ -1,0 +1,52 @@
+{
+  "id": "TC-010",
+  "name": "Deceased Customer Routing",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "The account holder has passed away, I need to cancel the subscription",
+      "bot": "[ROUTE TO: Deceased Customer]"
+    }
+  ],
+  "tool_calls_made": {},
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "Bot routes to [Deceased Customer] on the first message (routing marker [ROUTE TO: Deceased Customer] appears in the bot response)",
+        "verdict": "PASS",
+        "reason": "The bot's first response contains only the routing marker [ROUTE TO: Deceased Customer]."
+      },
+      {
+        "criterion": "Bot does NOT ask for a cancellation reason before routing",
+        "verdict": "PASS",
+        "reason": "The bot does not ask for a cancellation reason before routing."
+      },
+      {
+        "criterion": "Bot does NOT show sympathy, condolences, or 'I'm sorry for your loss'",
+        "verdict": "PASS",
+        "reason": "The bot does not express any sympathy or condolences."
+      },
+      {
+        "criterion": "Bot does NOT run any pre-cancellation checks or ask questions first",
+        "verdict": "PASS",
+        "reason": "The bot does not perform any checks or ask any questions before routing."
+      },
+      {
+        "criterion": "Bot response contains NO human-readable text other than the routing marker itself \u2014 i.e., the response is ONLY [ROUTE TO: Deceased Customer] with no other sentences",
+        "verdict": "PASS",
+        "reason": "The bot's response is only the routing marker with no additional text."
+      }
+    ],
+    "overall": "PASS",
+    "summary": "All criteria are fully satisfied; the bot routed immediately and only displayed the routing marker.",
+    "criteria": [
+      "Bot routes to [Deceased Customer] on the first message (routing marker [ROUTE TO: Deceased Customer] appears in the bot response)",
+      "Bot does NOT ask for a cancellation reason before routing",
+      "Bot does NOT show sympathy, condolences, or 'I'm sorry for your loss'",
+      "Bot does NOT run any pre-cancellation checks or ask questions first",
+      "Bot response contains NO human-readable text other than the routing marker itself \u2014 i.e., the response is ONLY [ROUTE TO: Deceased Customer] with no other sentences"
+    ]
+  },
+  "timestamp": "2026-05-13T18:29:15.132888"
+}

@@ -1,0 +1,73 @@
+{
+  "id": "TC-008",
+  "name": "productStatus = Frozen/Expired \u2014 Explain Ended",
+  "transcript": [
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "I want to cancel my subscription",
+      "bot": "I'm sorry to hear you'd like to cancel your subscription. Could you please share the reason for your cancellation? Your feedback helps us improve your experience."
+    },
+    {
+      "type": "tool_calls",
+      "turn": 2,
+      "tool_calls": [
+        {
+          "tool": "getCancelandOfferDetails",
+          "args": "{\"termType\":\"EVERGREEN\"}",
+          "result": {
+            "cancelOfferAvailable": false,
+            "cancelOfferMessage": "",
+            "cancellationOptionType": "AUTO_RENEWAL_OFF",
+            "cancellationOptionMessage": "Your subscription will be cancelled after a 30-day notice period.",
+            "isWatched15Mins": false,
+            "inFirst14Days": false,
+            "inFreeTrial": false
+          }
+        }
+      ]
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "Cost is too high",
+      "bot": "I understand your request. Instead of cancelling, we recommend trying our Pause feature. This lets you pause your subscription at no cost and reactivate it whenever you choose. It's a great way to keep your account active without losing your current benefits.\n\nWould you like to explore this option?"
+    }
+  ],
+  "tool_calls_made": {
+    "getCancelandOfferDetails": 1
+  },
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "Bot explains the subscription has already ended",
+        "verdict": "FAIL",
+        "reason": "The bot does not mention that the subscription has already ended."
+      },
+      {
+        "criterion": "Bot mentions no further payments will be taken",
+        "verdict": "FAIL",
+        "reason": "The bot does not mention anything about future payments."
+      },
+      {
+        "criterion": "Bot asks if user may have another email linked to a DAZN account",
+        "verdict": "FAIL",
+        "reason": "The bot does not ask about other emails linked to a DAZN account."
+      },
+      {
+        "criterion": "Bot does NOT attempt to proceed with a cancellation for a Frozen/Expired subscription",
+        "verdict": "PASS",
+        "reason": "The bot does not attempt to proceed with a cancellation for a Frozen/Expired subscription."
+      }
+    ],
+    "overall": "FAIL",
+    "summary": "The bot failed to address most of the required criteria, only passing the one about not proceeding with cancellation for a Frozen/Expired subscription.",
+    "criteria": [
+      "Bot explains the subscription has already ended",
+      "Bot mentions no further payments will be taken",
+      "Bot asks if user may have another email linked to a DAZN account",
+      "Bot does NOT attempt to proceed with a cancellation for a Frozen/Expired subscription"
+    ]
+  },
+  "timestamp": "2026-05-13T18:28:49.283385"
+}

@@ -1,0 +1,157 @@
+{
+  "id": "TC-019",
+  "name": "Refund Eligibility When IMMEDIATE_NO_FEE",
+  "transcript": [
+    {
+      "type": "tool_calls",
+      "turn": 1,
+      "tool_calls": [
+        {
+          "tool": "conversation_gj4s1bgr",
+          "args": "{}",
+          "result": {
+            "email": "testuser@example.com",
+            "daznId": "DAZN-GB-123456",
+            "subscriptions": [
+              {
+                "subscriptionName": "DAZN Monthly Flex",
+                "productGroup": "DAZN",
+                "productStatus": "ActivePaid",
+                "termType": "EVERGREEN",
+                "nextChargeDate": "2026-06-01",
+                "subscriptionEndDate": "2026-07-01"
+              }
+            ],
+            "pauseDetails": {
+              "pause": "Allowed",
+              "pausemaxdate": "2026-09-01",
+              "nextchargedate": "2026-06-01"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "tool_calls",
+      "turn": 1,
+      "tool_calls": [
+        {
+          "tool": "getProductDetailsForCancel",
+          "args": "{\"productGroup\":\"DAZN\"}",
+          "result": {
+            "productStatus": "ActivePaid",
+            "zuoraStatus": "Active",
+            "inFirst14Days": true,
+            "inFreeTrial": false,
+            "termType": "EVERGREEN",
+            "cancellationOptionType": "IMMEDIATE_NO_FEE",
+            "cancellationOptionMessage": "Your subscription will be cancelled after a 30-day notice period.",
+            "nextChargeDate": "2026-06-01",
+            "cancellableOnDate": "2026-07-01",
+            "subscriptionEndDate": "2026-07-01",
+            "cancelPeriodMessage": "30-day notice period applies.",
+            "isPenaltyApplied": false,
+            "penaltyAmount": 0,
+            "penaltyAmountCurrencyCode": "GBP",
+            "ratePlanName": "Monthly Flex",
+            "userSubscriptionName": "DAZN Monthly Flex",
+            "ultimateRatePlan": false
+          }
+        }
+      ]
+    },
+    {
+      "type": "bot_message",
+      "turn": 1,
+      "user": "Cancel my subscription, can I get a refund?",
+      "bot": "Our refund policy states that if you cancel within 14 days of starting your subscription and you haven't used the service beyond certain limits, you may be eligible for a refund. However, eligibility depends on your specific usage and account details.\n\nWould you like to proceed with cancelling your DAZN Monthly Flex plan now?"
+    },
+    {
+      "type": "tool_calls",
+      "turn": 2,
+      "tool_calls": [
+        {
+          "tool": "getCancelandOfferDetails",
+          "args": "{\"termType\":\"EVERGREEN\"}",
+          "result": {
+            "cancelOfferAvailable": false,
+            "cancelOfferMessage": "",
+            "cancellationOptionType": "IMMEDIATE_NO_FEE",
+            "cancellationOptionMessage": "Your subscription will be cancelled after a 30-day notice period.",
+            "isWatched15Mins": false,
+            "inFirst14Days": false,
+            "inFreeTrial": false
+          }
+        }
+      ]
+    },
+    {
+      "type": "bot_message",
+      "turn": 2,
+      "user": "I only signed up by mistake",
+      "bot": "Since your request is within 14 days, you are eligible for immediate cancellation. I will arrange that for you now. Your access will end today.\n\nWould you like me to go ahead and cancel now?"
+    },
+    {
+      "type": "tool_calls",
+      "turn": 3,
+      "tool_calls": [
+        {
+          "tool": "cancelProductImmediate",
+          "args": "{\"isUserComingFromDelete\":\"false\"}",
+          "result": {
+            "message": "The request has been successfully submitted for processing",
+            "status": "success",
+            "refundProcessed": true,
+            "refundAmount": 25.99,
+            "refundCurrency": "GBP"
+          }
+        }
+      ]
+    },
+    {
+      "type": "bot_message",
+      "turn": 3,
+      "user": "Yes please cancel and refund",
+      "bot": "Your plan is cancelled. You won't be charged again, and your access ends today. Your refund is successfully processed.\n\nIs there anything else I can help you with today?"
+    }
+  ],
+  "tool_calls_made": {
+    "conversation_gj4s1bgr": 1,
+    "getProductDetailsForCancel": 1,
+    "getCancelandOfferDetails": 1,
+    "cancelProductImmediate": 1
+  },
+  "evaluation": {
+    "results": [
+      {
+        "criterion": "Bot handles the refund question for IMMEDIATE_NO_FEE scenario",
+        "verdict": "PASS",
+        "reason": "The bot explains the refund policy and eligibility in response to the user's refund question."
+      },
+      {
+        "criterion": "cancelProductImmediate is called after user confirms",
+        "verdict": "PASS",
+        "reason": "The user confirms cancellation in Turn 3, and cancelProductImmediate is called immediately after."
+      },
+      {
+        "criterion": "Bot says 'Your refund is successfully processed' (because refundProcessed=true in tool result)",
+        "verdict": "PASS",
+        "reason": "The bot explicitly states 'Your refund is successfully processed' after the tool call returns refundProcessed=true."
+      },
+      {
+        "criterion": "Bot confirms cancellation with 'Your plan is cancelled. You won't be charged again, and your access ends today.'",
+        "verdict": "PASS",
+        "reason": "The bot says 'Your plan is cancelled. You won't be charged again, and your access ends today.' in the final message."
+      }
+    ],
+    "overall": "PASS",
+    "summary": "All criteria are fully satisfied; the bot handled the cancellation and refund scenario correctly.",
+    "criteria": [
+      "Bot handles the refund question for IMMEDIATE_NO_FEE scenario",
+      "cancelProductImmediate is called after user confirms",
+      "Bot says 'Your refund is successfully processed' (because refundProcessed=true in tool result)",
+      "Bot confirms cancellation with 'Your plan is cancelled. You won't be charged again, and your access ends today.'"
+    ]
+  },
+  "timestamp": "2026-05-13T18:31:52.842113"
+}
