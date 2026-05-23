@@ -51,11 +51,17 @@ In the **Prompt** tab, click **🔍 Parse**. The parser scans your prompt for al
 
 ### 8. Run the optimization loop
 
-Choose a mode in the header:
-- **Auto** — runs all iterations unattended until 100% pass or max iterations reached
-- **Step** — pauses after each iteration so you can review the repaired prompt before continuing
+Open **Run options** (top-right) to configure:
 
-Set **Max Iterations** (default 10), then click **⚡ Optimize**. Watch the test panel update in real time via the SSE stream.
+| Setting | Options |
+|---|---|
+| **Target model** | GPT-4.1, GPT-5.1, or Claude Sonnet 4.6 — prompts are optimized using model-specific writing guidelines |
+| **Mode** | **Auto** (runs until 100% pass or max iterations) or **Step** (pause after each iteration to review) |
+| **Max iterations** | 1–20 (default 10) |
+
+Click **Optimize**. Watch the Tests panel update in real time via the SSE stream. Test pass/fail counts appear on each test in the sidebar — not in Run options.
+
+Settings (⚙) holds your default OpenAI API key and fallback model. Run options overrides the model for that specific run.
 
 ### 9. Copy the final prompt
 
@@ -287,11 +293,16 @@ Prompt optimization & measurement/
 │── Core application ────────────────────────────────────────────────
 ├── web_app.py                   ← Flask server: all REST API routes + SSE endpoint
 ├── runner.py                    ← optimization loop, bot simulator, evaluator, test generator
+├── model_guides.py              ← per-model prompt-writing guidelines (GPT-4.1, GPT-5.1, Claude, etc.)
 ├── db.py                        ← SQLite schema definition + all database operations
 ├── prompt_parser.py             ← regex-based prompt syntax extractor
+├── knowledge_store.py           ← acceptance rules + knowledge rubric for evaluation
+├── playwright_runner.py         ← live Yellow.ai bot tests via Playwright
+├── report_pdf.py                ← PDF report generation for Playwright runs
 │
 ├── templates/
-│   └── index.html               ← full single-page frontend (HTML + Tailwind CSS + JS)
+│   ├── index.html               ← main lab UI (Setup → Test & fix → Live validate)
+│   └── live_bot.html            ← Live Validate page (Playwright tests against real bot)
 │
 │── Configuration ───────────────────────────────────────────────────
 ├── lab_config.json              ← OpenAI key/model + Yellow.ai credentials (gitignore this)
@@ -365,16 +376,17 @@ The LLM judge. Sends the formatted transcript (user messages, bot replies, tool 
 **5. `generate_tests(requirements, sub_agents, memory_keys, tools, client, model)`**
 The test generator. Sends requirements text, sub-agent definitions, memory key definitions, and full tool schemas (including return_schema) to GPT. Returns test cases with conversation scripts, objective pass criteria, and per-test mock overrides calibrated to the tool return schemas.
 
-**6. `diagnose_and_repair(current_prompt, failed_results, client, model)`**
-The repair LLM. Constructs a user message containing:
-- All 4 platform guide files (loaded once at startup into `PROMPT_GUIDES`)
-- The current prompt
-- For each failing test: failed criteria, reasons, and last 8 transcript events
+**6. `diagnose_and_repair(..., target_model)`**
+The repair LLM. Constructs a user message containing all 4 platform guide files, reference names, acceptance rules, the current prompt, and failing test details. The system prompt includes a **MODEL OPTIMIZATION GUIDE** from `model_guides.py` for the selected target model. Returns `(diagnosis, new_prompt)` — the repaired prompt must be clean Markdown.
 
-Returns `(diagnosis, new_prompt)` — a concise root cause analysis and the complete repaired prompt text.
+**7. `format_prompt_presentation(...)`**
+Final formatting pass when all tests pass — restructures headings and emphasis without changing business logic.
 
-**7. `run_optimization(run_id, uc_id)`**
-The main loop. Runs entirely in a background daemon thread. Iterates from 1 to `max_iterations`: builds system prompt → runs all tests → evaluates → if all pass: save version and return → if failures: diagnose and repair → save iteration snapshot → if step mode: pause and wait → apply new prompt → repeat. Handles stop signals, step-through pause/resume, and all DB updates.
+**8. `run_optimization(run_id, uc_id)`**
+The main loop. Reads `model` from the run record (set via Run options). Resolves API model vs guideline model via `model_guides.resolve_api_model()`. Runs entirely in a background daemon thread.
+
+### `model_guides.py`
+Registry of target models for Run options (`GET /api/models`). Each entry defines display label, OpenAI API model routing, and prompt-writing guidelines injected into repair. Currently: GPT-4.1, GPT-5.1, Claude Sonnet 4.6. Anthropic models use guidelines-only mode (API falls back to Settings model).
 
 ### `db.py`
 All SQLite operations. Every function uses a context manager that opens a connection, commits on success, rolls back on exception, and always closes. `check_same_thread=False` allows safe use from multiple threads. `conn.row_factory = sqlite3.Row` makes rows dict-accessible; every function converts to plain dicts before returning.
@@ -665,8 +677,9 @@ iterations
 ### Runs
 | Method | Path | Description |
 |---|---|---|
-| POST | `/api/use-cases/<id>/run` | Start manual test run (no optimization); body: `{ids?: [...]}` |
-| POST | `/api/use-cases/<id>/optimize` | Start optimization loop; body: `{mode, max_iterations}` |
+| POST | `/api/use-cases/<id>/run` | Start manual test run; body: `{ids?: [...], model?: string}` |
+| POST | `/api/use-cases/<id>/optimize` | Start optimization loop; body: `{mode, max_iterations, model?}` |
+| GET | `/api/models` | List available target models for Run options |
 | GET | `/api/use-cases/<id>/runs` | List all runs with their iteration data |
 | GET | `/api/runs/<id>` | Get single run record |
 | POST | `/api/runs/<id>/continue` | Resume a paused step-through run |
@@ -942,7 +955,40 @@ Each detected item is returned with:
 
 ## 12. Frontend — UI Tabs and Operations
 
-### Tests Tab
+The lab uses a **3-step workflow** in the header: **Setup → Test & fix → Live validate**. Sub-tabs change per step.
+
+### Setup (step 1)
+- **Requirements** — business requirements text + Generate Tests
+- **Variables** — sub-agents and memory keys
+- **Tools** — workflow definitions and return schemas
+- **Prompt** — current editable prompt (what Optimize uses)
+
+### Test & fix (step 2)
+
+**Tests tab** — sidebar list of test cases with live status dots (pending / running / PASS / FAIL). **Run Tests** is in the panel footer. Click a test to see transcript, criteria, and diff in the main pane.
+
+**Runs tab** — history of simulated optimization runs with per-iteration diagnosis and prompt diffs.
+
+**Versions tab** — read-only prompt version viewer:
+- Narrow sidebar (~272px): searchable version picker, **Compare versions** button, metadata (lines, tokens, model), Load to Curr Prompt
+- Main pane: Overleaf-style split — **Markdown** source (with line numbers) | **Preview** (rendered with headings, bold, Yellow.ai chips for `{{vars}}`, workflows, rich media)
+- Draggable center divider; width persisted in `localStorage`
+- Compare modal: Diff / Changes / MD·Preview modes with word-level highlighting and token stats
+
+### Live validate (step 3)
+Embeds `live_bot.html` — Playwright tests against the real Yellow.ai bot. Select agents, generate & run tests, review transcripts, add acceptance rules on false negatives. **Past Runs** shows agent name (not run number or "headless"). Tests column is wider (360px) for readability.
+
+### Run options menu
+- **Target model** — GPT-4.1, GPT-5.1, Claude Sonnet 4.6 (Anthropic models apply guidelines only; simulation uses Settings API model)
+- **Optimization** — Auto / Step mode + max iterations
+
+**Optimize** button starts the loop. **Settings** (⚙) — API key and default model.
+
+### Other tabs (global)
+- **Rules** — acceptance rules across agents
+- **Knowledge** — knowledge store and rubric
+
+### Tests Tab (detail)
 Lists all test cases. Each card shows: test ID, name, status badge (pending / running / evaluating / PASS / FAIL), conversation transcript (user messages, tool calls with args and results, bot replies), and per-criterion verdicts with reasons. Cards are created on page load and updated live via SSE events during a run.
 
 ### Reqs Tab
@@ -960,11 +1006,13 @@ Expandable cards per tool. Each card: name input, description input, return_sche
 
 Save button calls `PUT /api/use-cases/<id>/tools` with the full current list (atomic replace).
 
-### Prompt Tab
-- Version selector dropdown (★ marks the current version)
-- Full-width code-style textarea
-- **Save** button — saves in place (`create_version: false`), no new version row
+### Prompt Tab (Setup)
+- Editable current prompt + trigger
+- Save / Save as version
 - **🔍 Parse** button — runs the prompt parser, opens Parse modal
+
+### Versions Tab
+See **Test & fix → Versions** above for the split viewer and compare flow.
 
 ### Runs Tab
 History of all runs for the current use case, newest first. Each run shows: mode, status, score (passed/total), timestamps. Expandable to show per-iteration rows: iteration number, score, diagnosis text, new prompt diff.
@@ -972,10 +1020,8 @@ History of all runs for the current use case, newest first. Each run shows: mode
 ### Settings Modal
 Fields:
 - OpenAI API Key (masked after save)
-- OpenAI Model (text input, default: `gpt-4.1`)
-- Yellow.ai Bot ID
-- Yellow.ai API Key (masked after save)
-- Yellow.ai Base URL
+- OpenAI Model (default API model; override per run in Run options)
+- Yellow.ai Bot ID / API Key / Base URL (used by Live Validate Playwright tests)
 
 ### Step-Through Modal
 Appears after each iteration when mode = "Step". Shows:
@@ -1012,7 +1058,14 @@ Appears after each iteration when mode = "Step". Shows:
 Open ⚙ Settings in the UI and save. No restart needed — `load_config()` re-reads the file on every API call.
 
 ### Model Selection
-Any OpenAI chat completions model works. `gpt-4.1` is recommended for accuracy. `gpt-4o` is faster and cheaper. Smaller models (GPT-3.5) may produce weaker evaluations and repairs.
+
+**Two levels:**
+1. **Settings → Model** — default OpenAI API model for all calls when Run options does not override
+2. **Run options → Target model** — per-run selection stored on the `runs.model` column; drives which API model runs sim/eval/repair (OpenAI models) and which **prompt-writing guidelines** are injected during repair
+
+Available target models (see `model_guides.py`): **GPT-4.1**, **GPT-5.1**, **Claude Sonnet 4.6**. Claude models apply Anthropic-specific prompt structure guidelines; API calls fall back to the Settings model.
+
+Repaired prompts are output as **clean Markdown** (`#` headings, **bold** emphasis, lists) regardless of input format.
 
 ### Bot Credentials
 `bot_id`, `yellowai_api_key`, and `base_url` are stored but not currently used by the optimization loop (which runs fully offline). They are plumbing for a future feature to validate the optimized prompt against the live Yellow.ai bot.

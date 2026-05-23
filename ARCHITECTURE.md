@@ -16,15 +16,16 @@
 8. [Prompt Parser — prompt_parser.py](#8-prompt-parser--prompt_parserpy)
 9. [Web API — web_app.py](#9-web-api--web_apppy)
 10. [Frontend — templates/index.html](#10-frontend--templatesindexhtml)
-11. [Configuration — lab_config.json](#11-configuration--lab_configjson)
-12. [Platform Reference Files](#12-platform-reference-files)
-13. [The Optimization Loop — End-to-End Flow](#13-the-optimization-loop--end-to-end-flow)
-14. [Real-Time Streaming — SSE Event Reference](#14-real-time-streaming--sse-event-reference)
-15. [Data Flows — Request Lifecycle](#15-data-flows--request-lifecycle)
-16. [Key Design Decisions & Tradeoffs](#16-key-design-decisions--tradeoffs)
-17. [Running the System](#17-running-the-system)
-18. [Adding a New Use Case](#18-adding-a-new-use-case)
-19. [Common Failure Modes](#19-common-failure-modes)
+11. [Model-specific optimization — model_guides.py](#11-model-specific-optimization--model_guidesspy)
+12. [Configuration — lab_config.json](#12-configuration--lab_configjson)
+13. [Platform Reference Files](#13-platform-reference-files)
+14. [The Optimization Loop — End-to-End Flow](#14-the-optimization-loop--end-to-end-flow)
+15. [Real-Time Streaming — SSE Event Reference](#15-real-time-streaming--sse-event-reference)
+16. [Data Flows — Request Lifecycle](#16-data-flows--request-lifecycle)
+17. [Key Design Decisions & Tradeoffs](#17-key-design-decisions--tradeoffs)
+18. [Running the System](#18-running-the-system)
+19. [Adding a New Use Case](#19-adding-a-new-use-case)
+20. [Common Failure Modes](#20-common-failure-modes)
 
 ---
 
@@ -224,9 +225,13 @@ SSE endpoint thread (per browser connection)
 |---|---|---|
 | `web_app.py` | Flask server, all REST + SSE routes | Backend |
 | `runner.py` | Test runner, evaluator, test generator, optimization loop | Backend |
+| `model_guides.py` | Per-model prompt-writing guidelines for repair/optimization | Backend |
 | `db.py` | SQLite schema, all database operations | Backend |
 | `prompt_parser.py` | Regex-based prompt syntax extractor | Backend |
-| `templates/index.html` | Single-page frontend (all HTML + CSS + JS) | Frontend |
+| `playwright_runner.py` | Live Yellow.ai bot tests via Playwright | Backend |
+| `knowledge_store.py` | Acceptance rules + knowledge rubric | Backend |
+| `templates/index.html` | Main lab UI — Setup, Test & fix, Live validate | Frontend |
+| `templates/live_bot.html` | Live Validate page — Playwright test runner | Frontend |
 | `lab_config.json` | Runtime config: API keys, model, bot credentials | Config |
 | `backend_prompt.md` | Yellow.ai platform system prompt (never optimized) | Platform |
 | `Prompt Guides/*.md` | 4 Yellow.ai reference files loaded into repair LLM | Platform |
@@ -261,8 +266,11 @@ use_cases           — top-level entity: name, timestamps
   └── memory_keys   — one-to-many: known variables (key_name + descriptions)
   └── tools         — one-to-many: workflow tool definitions (name, description, return_schema JSON)
   └── tests         — one-to-many: test cases (script, criteria, mocks as JSON)
-  └── runs          — one-to-many: optimization or manual run records
+  └── runs          — one-to-many: optimization or manual run records (includes `model` column)
        └── iterations — one-to-many: per-iteration snapshot (prompt, results, diagnosis, new_prompt)
+
+playwright_runs     — live bot test runs (use_case_ids JSON, mode, bot_id)
+  └── playwright_results — per-test results from Playwright runs
 ```
 
 All child tables have `ON DELETE CASCADE` so deleting a use case cleans up everything.
@@ -362,6 +370,8 @@ PROMPT_GUIDES = _load_guides()
 ```
 
 At module import time, all 4 Yellow.ai platform guide files are read from `Prompt Guides/` and concatenated into a single string with section separators. This string is injected into the repair LLM's context at every optimization iteration. Loading once at startup avoids repeated disk reads.
+
+**Model guides** (`model_guides.py`) are loaded per repair call: `get_model_guidelines(target_model)` returns presentation rules + model-specific phrasing appended to `REPAIR_SYSTEM`. `format_prompt_presentation()` polishes the final prompt on all-pass.
 
 ### 7.3 `build_system_prompt(frontend_prompt)` — The Simulation Core
 
@@ -563,6 +573,7 @@ GET  /                                    → serve index.html
 # Config
 GET  /api/config                          → return config (API keys masked)
 POST /api/config                          → save config
+GET  /api/models                          → list target models for Run options
 
 # Use cases
 GET  /api/use-cases                       → list all use cases
@@ -585,8 +596,8 @@ POST /api/use-cases/<id>/prompt/parse     → parse prompt, return detected item
 POST /api/use-cases/<id>/generate-tests   → LLM generates tests from requirements
 
 # Runs
-POST /api/use-cases/<id>/run              → start manual test run (no optimization)
-POST /api/use-cases/<id>/optimize         → start optimization run
+POST /api/use-cases/<id>/run              → start manual test run; body: {ids?, model?}
+POST /api/use-cases/<id>/optimize         → start optimization run; body: {mode, max_iterations, model?}
 POST /api/runs/<id>/continue              → resume step-through run
 POST /api/runs/<id>/stop                  → stop running/paused run
 GET  /api/runs/<id>                       → get run record
@@ -645,24 +656,24 @@ def api_stream(run_id):
 
 ## 10. Frontend — templates/index.html
 
-A single 1,172-line HTML file. No framework, no build step — vanilla JavaScript + Tailwind CSS (loaded from CDN).
+Single-page app (~4,000 lines). Vanilla JavaScript + Tailwind CSS (CDN) + `marked` for Markdown preview.
 
-### Layout
+### Layout — 3-step workflow
 
 ```
-┌──────────────────────────────────────────────────────┐
-│  Header: Use case selector | Mode | Max iter | Buttons│
-├──────────────────────┬───────────────────────────────┤
-│  Sidebar (300px)     │  Main content area            │
-│  Tabs:               │  Test list: per-test cards    │
-│  ├── Tests           │  Each card: status, criteria, │
-│  ├── Reqs            │  transcript, tool calls       │
-│  ├── Variables       │                               │
-│  ├── Tools           │                               │
-│  ├── Prompt          │                               │
-│  └── Runs            │                               │
-└──────────────────────┴───────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│  Prompt Lab │ Agent picker │ Run options │ Optimize │ Settings      │
+├─────────────────────────────────────────────────────────────────────┤
+│  [1 Setup]  ›  [2 Test & fix]  ›  [3 Live validate]                 │
+├──────────────────┬──────────────────────────────────────────────────┤
+│  Sidebar         │  Main pane (test detail / runs / version viewer)  │
+│  Tests|Runs|Ver  │  Versions: Markdown │ Preview split                │
+└──────────────────┴──────────────────────────────────────────────────┘
 ```
+
+**Run options:** Target model (GPT-4.1, GPT-5.1, Claude Sonnet 4.6) + Auto/Step + max iterations. No test score in this menu.
+
+**Versions sidebar:** ~272px default; searchable version picker, Compare, meta, Load to Curr Prompt.
 
 ### Global State
 
@@ -732,9 +743,44 @@ Triggered by the 🔍 Parse button in the Prompt tab. Structure:
 4. Unmatched items: `+ Add` button marks them as "to add" (updates `_parseResult` in memory)
 5. "Apply to Config" button: sends all unmatched items to the Variables and Tools APIs, refreshes config
 
+5. "Apply to Config" button: sends all unmatched items to the Variables and Tools APIs, refreshes config
+
+### Live Validate — templates/live_bot.html
+
+Embedded via iframe when step 3 is active (`?embedded=1` hides the page header). Playwright-based tests against the real Yellow.ai bot.
+
+| Area | Behavior |
+|---|---|
+| Left sidebar | Bot URL, agent multi-select, credentials (auto-detected), Past Runs |
+| Tests panel | 360px wide list of generated tests |
+| Past Runs | Shows **agent name** only (from `use_case_ids`), timestamp, pass/total, PDF + delete |
+| Run footer | Generate & Run Tests |
+
+Removed UI: stage banners, Run Mode (headless) section — runs are always headless in background.
+
+Routes: `/live-bot`, `/api/playwright/*` (see web_app.py).
+
 ---
 
-## 11. Configuration — lab_config.json
+## 11. Model-specific optimization — model_guides.py
+
+`MODEL_OPTIONS` defines target models exposed via `GET /api/models`. Each has:
+- `id`, `label`, `provider`
+- `api_model` — OpenAI model ID for API calls, or `None` for guidelines-only (Claude)
+
+`resolve_api_model(selected, fallback)` → `(api_model, guideline_model_id)`
+
+`get_model_guidelines(model_id)` → markdown block appended to `REPAIR_SYSTEM` as **MODEL OPTIMIZATION GUIDE**, covering:
+- Presentation rules (headings, bold, lists — output clean Markdown always)
+- Model-specific phrasing (GPT: front-loaded rules; Claude: XML sections + "You must")
+
+`format_prompt_presentation()` runs on all-pass to polish structure without changing logic.
+
+Per-run model stored in `runs.model` column (migration via `ALTER TABLE`).
+
+---
+
+## 12. Configuration — lab_config.json
 
 ```json
 {
@@ -749,12 +795,12 @@ Triggered by the 🔍 Parse button in the Prompt tab. Structure:
 | Field | Used for | Required |
 |---|---|---|
 | `openai_api_key` | All LLM calls (simulation, evaluation, generation, repair) | Yes |
-| `openai_model` | Which model to use for all LLM calls | Yes (defaults to gpt-4.1) |
-| `bot_id` | Yellow.ai bot identifier (for future live bot integration) | No |
-| `yellowai_api_key` | Yellow.ai API authentication (for future live bot integration) | No |
-| `base_url` | Yellow.ai regional endpoint (for future live bot integration) | No |
+| `openai_model` | Default API model when Run options does not override | Yes (defaults to gpt-4.1) |
+| `bot_id` | Yellow.ai bot identifier for Live Validate (Playwright) | No |
+| `yellowai_api_key` | Yellow.ai API authentication for Live Validate | No |
+| `base_url` | Yellow.ai regional endpoint for Live Validate | No |
 
-`bot_id`, `yellowai_api_key`, and `base_url` are stored but not yet used by the optimization loop (which is fully local/simulation-based). They are available for future extension to test against the live bot.
+`bot_id`, `yellowai_api_key`, and `base_url` are used by the **Live Validate** Playwright flow. The simulated optimization loop uses OpenAI only.
 
 Config is loaded fresh on every relevant request — changing it in the Settings modal takes effect on the next operation without restarting the server.
 
@@ -762,7 +808,7 @@ Sensitive fields are masked in `GET /api/config`: all but the last 4 characters 
 
 ---
 
-## 12. Platform Reference Files
+## 13. Platform Reference Files
 
 All 4 files live in `Prompt Guides/` and are loaded once at startup into `PROMPT_GUIDES`. They are **never written by the system** — they are Yellow.ai's official documentation.
 
@@ -782,7 +828,7 @@ They are also used by `prompt_parser.py` to define what syntax patterns to detec
 
 ---
 
-## 13. The Optimization Loop — End-to-End Flow
+## 14. The Optimization Loop — End-to-End Flow
 
 ### Setup Phase (User Actions in UI)
 
@@ -845,7 +891,7 @@ For each iteration n:
 
 ---
 
-## 14. Real-Time Streaming — SSE Event Reference
+## 15. Real-Time Streaming — SSE Event Reference
 
 Events flow: `runner.py → queue.Queue → SSE endpoint → browser EventSource → handleSseEvent()`
 
@@ -877,7 +923,7 @@ Events flow: `runner.py → queue.Queue → SSE endpoint → browser EventSource
 
 ---
 
-## 15. Data Flows — Request Lifecycle
+## 16. Data Flows — Request Lifecycle
 
 ### Generate Tests
 
@@ -940,7 +986,7 @@ Browser → POST .../prompt/parse again        # re-verify all matched
 
 ---
 
-## 16. Key Design Decisions & Tradeoffs
+## 17. Key Design Decisions & Tradeoffs
 
 ### Why local simulation instead of live bot API calls?
 
@@ -1001,7 +1047,7 @@ Browser → POST .../prompt/parse again        # re-verify all matched
 
 ---
 
-## 17. Running the System
+## 18. Running the System
 
 ### Prerequisites
 
@@ -1041,7 +1087,7 @@ lsof -ti :5001 | xargs kill -9
 
 ---
 
-## 18. Adding a New Use Case
+## 19. Adding a New Use Case
 
 ### Via the UI
 
@@ -1062,7 +1108,7 @@ Add to `db.py`'s `_seed()` or create a new `_seed_myagent()` function with hardc
 
 ---
 
-## 19. Common Failure Modes
+## 20. Common Failure Modes
 
 ### "OpenAI API key not configured"
 Go to ⚙ Settings and enter the key.

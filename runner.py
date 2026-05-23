@@ -13,6 +13,8 @@ from pathlib import Path
 from openai import OpenAI
 
 import db
+import knowledge_store
+from model_guides import get_model_guidelines, resolve_api_model
 
 BASE_DIR    = Path(__file__).parent
 CONFIG_FILE = BASE_DIR / "lab_config.json"
@@ -108,6 +110,65 @@ def build_openai_tools(tools: list[dict]) -> list[dict]:
     ]
 
 
+# ── Acceptance rules (human-curated overrides for LLM strictness) ─────────────
+
+def _format_acceptance_rules(uc_id: int | None, test_id: str | None = None,
+                              header: str = "ACCEPTANCE RULES",
+                              intro: str = "") -> str:
+    """
+    Build a formatted block of human-approved validity rules for a given agent.
+    Returns "" if no rules exist or uc_id is None.
+    """
+    if not uc_id:
+        return ""
+    try:
+        rules = db.get_acceptance_rules_for_test(uc_id, test_id)
+    except Exception:
+        rules = []
+    if not rules:
+        return ""
+
+    lines = [f"{header}:"]
+    if intro:
+        lines.append(intro)
+    for i, r in enumerate(rules, 1):
+        scope_tag = "[test-specific]" if r.get("scope") == "test" else "[agent-wide]"
+        lines.append(f"  {i}. {scope_tag} {r['human_rule']}")
+    return "\n".join(lines) + "\n\n"
+
+
+def suggest_acceptance_rule(criterion: str, llm_reason: str, actual_response: str,
+                             client: OpenAI, model: str) -> str:
+    """
+    Ask the LLM to draft a one-line generalization the user can edit before saving.
+    The rule should describe WHY the bot's actual response is valid even though
+    the LLM marked it FAIL.
+    """
+    sys = (
+        "You write one-line acceptance rules for an LLM judge that was too strict. "
+        "Read the criterion, the LLM's failure reason, and the bot's actual response. "
+        "Produce a single short sentence (max ~20 words) that generalizes WHY the bot's "
+        "response is acceptable. The rule will be injected into future evaluations to "
+        "prevent the same false negative. Do not quote the specific test — make it a "
+        "reusable principle. Respond with just the rule text, no quotes or prefix."
+    )
+    user = (
+        f"CRITERION: {criterion}\n\n"
+        f"LLM SAID FAIL BECAUSE: {llm_reason}\n\n"
+        f"BOT ACTUALLY SAID/SHOWED:\n{actual_response[:1500]}"
+    )
+    try:
+        r = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": sys},
+                      {"role": "user", "content": user}],
+            temperature=0.2,
+        )
+        return (r.choices[0].message.content or "").strip().strip('"').strip()
+    except Exception:
+        return ""
+
+
 # ── Mock resolution ───────────────────────────────────────────────────────────
 
 def resolve_mock(tool_name: str, mock_overrides: dict) -> dict:
@@ -135,6 +196,11 @@ For each criterion, respond PASS or FAIL. PASS only if clearly and unambiguously
 - "Tool X is NOT called" = tool name does NOT appear in the tool_calls list
 - "Bot routes to [AgentX]" = [ROUTE TO: AgentX] appears in a bot message
 - "Bot response contains NO human-readable text other than the routing marker" = PASS only if the bot message is literally only [ROUTE TO:...] with no other sentences
+
+TRANSCRIPT FORMAT — rich media markers:
+- `[buttons: A | B | C]` at the end of a bot message means the bot displayed quick-reply buttons A, B, and C. Treat these as OPTIONS the bot SHOWED — they count as bot output.
+- `[carousel (N cards): ...]` means the bot displayed a card carousel. Card titles and button labels inside are content the bot SHOWED.
+- When a criterion says "bot shows options X, Y, Z" or "bot shows quick-reply buttons", check the `[buttons: ...]` block — the labels there ARE the bot's shown options.
 
 Respond ONLY with this JSON (no markdown):
 {"results": [{"criterion": "...", "verdict": "PASS|FAIL", "reason": "one sentence"}], "overall": "PASS|FAIL", "summary": "one sentence"}
@@ -211,7 +277,8 @@ def run_conversation(tc_id: str, script: list[str], mock_overrides: dict,
     return {"transcript": transcript, "tool_calls_made": call_counts, "stopped_reason": "completed"}
 
 
-def evaluate_transcript(result: dict, criteria: list[str], client: OpenAI, model: str) -> dict:
+def evaluate_transcript(result: dict, criteria: list[str], client: OpenAI, model: str,
+                        use_case_id: int | None = None, test_id: str | None = None) -> dict:
     if not criteria:
         return {"overall": "SKIP", "results": [], "summary": "No criteria defined", "criteria": []}
 
@@ -223,7 +290,16 @@ def evaluate_transcript(result: dict, criteria: list[str], client: OpenAI, model
             lines.append(f"User (Turn {e['turn']}): {e['user']}")
             lines.append(f"Bot  (Turn {e['turn']}): {e['bot']}")
 
+    rubric_section = knowledge_store.format_for_evaluator(use_case_id)
+    rules_section = _format_acceptance_rules(
+        use_case_id, test_id,
+        header="ACCEPTANCE RULES — apply these when judging",
+        intro="A response matching any of these human-approved rules MUST be marked PASS even if a criterion sounds stricter. Note in the reason which rule applied.",
+    )
+
     prompt = (
+        f"{rubric_section}"
+        f"{rules_section}"
         f"TRANSCRIPT:\n{chr(10).join(lines)}\n\n"
         f"TOOL CALLS MADE: {json.dumps(result.get('tool_calls_made', {}))}\n\n"
         f"PASS CRITERIA:\n" + "\n".join(f"{i+1}. {c}" for i, c in enumerate(criteria))
@@ -267,7 +343,7 @@ Rules:
 
 def generate_tests(requirements: str, sub_agents: list[dict], memory_keys: list[dict],
                    tools: list[dict], client: OpenAI, model: str,
-                   prompt: str = "") -> list[dict]:
+                   prompt: str = "", use_case_id: int | None = None) -> list[dict]:
     sa_text  = "\n".join(f"- [{sa['name']}]: {sa.get('description','')}" for sa in sub_agents)
     mk_text  = "\n".join(f"- {{{{{mk['key_name']}}}}}: {mk.get('description','')}" for mk in memory_keys)
     tools_text = "\n\n".join(
@@ -277,9 +353,16 @@ def generate_tests(requirements: str, sub_agents: list[dict], memory_keys: list[
 
     prompt_section = f"CURRENT AGENT PROMPT:\n{prompt}\n\n" if prompt and prompt.strip() else ""
 
+    rules_section = _format_acceptance_rules(
+        use_case_id,
+        header="ACCEPTANCE RULES — accepted bot behaviours from prior human review",
+        intro="When writing 'expected' and 'pass_criteria', ensure your assertions do NOT contradict these rules. The criteria you write must still PASS for any response covered by a rule below.",
+    )
+
     user_msg = (
         f"BUSINESS REQUIREMENTS:\n{requirements}\n\n"
         f"{prompt_section}"
+        f"{rules_section}"
         f"SUB-AGENTS (routing destinations):\n{sa_text}\n\n"
         f"MEMORY KEYS:\n{mk_text}\n\n"
         f"TOOLS WITH RETURN SCHEMAS:\n{tools_text}\n\n"
@@ -310,6 +393,7 @@ Your job:
 2. Diagnose the root cause of each failure (be specific — which instruction is missing, ambiguous, or contradicted?)
 3. Produce a repaired prompt that fixes the failures without breaking passing tests
 4. Make surgical edits only — do not rewrite sections that are working
+5. Always output the complete prompt as clean, presentable Markdown — restructure plain-text or messy input into proper headings, lists, and bold emphasis (see MODEL OPTIMIZATION GUIDE)
 
 SYNTAX RULES (platform-compatible — the prompt is copy-pasted directly into Yellow.ai):
 - Variables: ALWAYS use {{variableName}} using the EXACT name from the REFERENCE NAMES list
@@ -318,17 +402,8 @@ SYNTAX RULES (platform-compatible — the prompt is copy-pasted directly into Ye
 - Never invent names not present in the REFERENCE NAMES list
 - One action per step — never combine two actions in one step
 
-FORMATTING RULES (match Yellow.ai's rich-text editor format exactly):
-- Use # for top-level section titles (GOAL, RULES, GLOBAL VALIDATION RULES, etc.)
-- Use ## for step headers: ## Step N — Descriptive Name
-- Use ### for sub-sections within a step
-- Use - bullet points for conditions, branching logic, and rules
-- Wrap exact phrases the bot must say verbatim in code blocks: `Ask exactly: "..."`
-- Keep blank lines between sections for readability
-- Preserve the overall document structure of the input prompt
-
 Respond with JSON only:
-{"diagnosis": "concise root cause analysis (under 300 words)", "new_prompt": "complete repaired prompt text"}"""
+{"diagnosis": "concise root cause analysis (under 300 words)", "new_prompt": "complete repaired prompt in clean Markdown"}"""
 
 
 def _build_reference_names(uc_config: dict) -> str:
@@ -364,7 +439,8 @@ def _build_reference_names(uc_config: dict) -> str:
 
 def diagnose_and_repair(current_prompt: str, failed_results: list[dict],
                         client: OpenAI, model: str,
-                        uc_config: dict | None = None) -> tuple[str, str]:
+                        uc_config: dict | None = None,
+                        target_model: str | None = None) -> tuple[str, str]:
     failures_text = ""
     for r in failed_results:
         tc_id = r.get("tc_id", "?")
@@ -383,21 +459,63 @@ def diagnose_and_repair(current_prompt: str, failed_results: list[dict],
 
     guides_section = f"PLATFORM GUIDES:\n{PROMPT_GUIDES}\n\n" if PROMPT_GUIDES else ""
     ref_names      = _build_reference_names(uc_config) + "\n\n" if uc_config else ""
+    rules_section  = _format_acceptance_rules(
+        (uc_config or {}).get("id"),
+        header="ACCEPTANCE RULES — DO NOT try to fix these",
+        intro="These describe bot behaviours a human has already approved. The current prompt does NOT need to enforce these — any failure in the transcript that is covered by a rule below should be ignored, not repaired.",
+    )
     prompt = (
         f"{guides_section}"
         f"{ref_names}"
+        f"{rules_section}"
         f"CURRENT PROMPT:\n{current_prompt}\n\n"
         f"FAILED TESTS:\n{failures_text}"
     )
 
+    guide_model = target_model or model
+    model_guide = get_model_guidelines(guide_model)
+    system_content = REPAIR_SYSTEM + f"\n\nMODEL OPTIMIZATION GUIDE (target LLM: {guide_model}):\n{model_guide}"
+
     r = client.chat.completions.create(
         model=model,
-        messages=[{"role": "system", "content": REPAIR_SYSTEM}, {"role": "user", "content": prompt}],
+        messages=[{"role": "system", "content": system_content}, {"role": "user", "content": prompt}],
         temperature=0.3,
         response_format={"type": "json_object"},
     )
     data = json.loads(r.choices[0].message.content)
     return data.get("diagnosis", ""), data.get("new_prompt", current_prompt)
+
+
+def format_prompt_presentation(prompt: str, client: OpenAI, model: str,
+                               target_model: str | None = None) -> str:
+    """Ensure the prompt is clean Markdown without changing business logic."""
+    if not prompt or not prompt.strip():
+        return prompt
+    guide_model = target_model or model
+    guide = get_model_guidelines(guide_model)
+    system = (
+        "You are a technical editor for Yellow.ai agent prompts.\n"
+        "Rewrite the prompt as clean, presentable Markdown with proper headings (#, ##, ###), "
+        "bold emphasis on critical rules, and bullet/numbered lists.\n"
+        "Do NOT change variable names, tool names, agent routes, business logic, or Yellow.ai syntax.\n"
+        "Do NOT add or remove steps — only improve structure and readability.\n\n"
+        f"MODEL OPTIMIZATION GUIDE:\n{guide}\n\n"
+        'Respond with JSON only: {"new_prompt": "complete formatted prompt"}'
+    )
+    try:
+        r = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": f"PROMPT TO FORMAT:\n{prompt}"},
+            ],
+            temperature=0.2,
+            response_format={"type": "json_object"},
+        )
+        data = json.loads(r.choices[0].message.content)
+        return data.get("new_prompt", prompt) or prompt
+    except Exception:
+        return prompt
 
 
 # ── Credential detection ─────────────────────────────────────────────────────
@@ -491,7 +609,8 @@ CREDENTIAL AND OTP RULES (only if credentials are provided below):
 def generate_playwright_tests(requirements: str, sub_agents: list, tools: list,
                                prompt: str, client: OpenAI, model: str,
                                email: str = "", phone: str = "",
-                               trigger: str = "") -> list[dict]:
+                               trigger: str = "",
+                               use_case_id: int | None = None) -> list[dict]:
     sa_text    = "\n".join(f"- [{sa['name']}]: {sa.get('description','')}" for sa in sub_agents)
     tools_text = "\n".join(f"- {t['name']}: {t.get('description','')}" for t in tools)
     prompt_sec = f"\nAGENT PROMPT:\n{prompt}\n" if prompt and prompt.strip() else ""
@@ -525,10 +644,17 @@ def generate_playwright_tests(requirements: str, sub_agents: list, tools: list,
         if needs.get("needs_otp"):
             cred_section += "  OTP: Use {{OTP}} as the user message when the bot asks for an OTP.\n"
 
+    rules_section = _format_acceptance_rules(
+        use_case_id,
+        header="ACCEPTANCE RULES — accepted bot behaviours from prior human review",
+        intro="When writing 'expected', 'pass_criteria', and 'agent_behavior_expectations', ensure your assertions do NOT contradict these rules. Any response covered by a rule below must still PASS the criteria you write.",
+    )
+
     user_msg = (
         f"BUSINESS REQUIREMENTS:\n{requirements}\n"
         f"{trigger_sec}"
         f"{prompt_sec}\n"
+        f"{rules_section}"
         f"SUB-AGENTS (routing destinations):\n{sa_text}\n\n"
         f"TOOLS:\n{tools_text}\n\n"
         f"{cred_section}\n"
@@ -613,7 +739,9 @@ overall = PASS only if ALL turn verdicts AND ALL criteria verdicts AND ALL behav
 def evaluate_playwright_transcript(turns: list, criteria: list,
                                     client: OpenAI, model: str,
                                     behavior_expectations: list | None = None,
-                                    other_agent_context: dict | None = None) -> dict:
+                                    other_agent_context: dict | None = None,
+                                    use_case_id: int | None = None,
+                                    test_id: str | None = None) -> dict:
     """
     Evaluate a Playwright transcript.
 
@@ -654,8 +782,17 @@ def evaluate_playwright_transcript(turns: list, criteria: list,
     else:
         agents_section = ""
 
+    rubric_section = knowledge_store.format_for_evaluator(use_case_id)
+    rules_section = _format_acceptance_rules(
+        use_case_id, test_id,
+        header="ACCEPTANCE RULES — apply these when judging",
+        intro="A response matching any of these human-approved rules MUST be marked PASS even if a criterion sounds stricter. Note in the reason which rule applied.",
+    )
+
     prompt = (
+        f"{rubric_section}"
         f"{agents_section}"
+        f"{rules_section}"
         f"CONVERSATION:\n{chr(10).join(lines)}\n\n"
         f"PASS CRITERIA:\n{criteria_text}\n\n"
         f"AGENT BEHAVIOR EXPECTATIONS:\n{behavior_text}"
@@ -702,12 +839,15 @@ def run_optimization(run_id: int, uc_id: int):
         return
 
     try:
-        client, model = _make_client()
+        client, default_model = _make_client()
         uc    = db.get_use_case(uc_id)
         tests = db.get_tests(uc_id)
         run   = db.get_run(run_id)
         mode  = run["mode"]
         max_n = run["max_iterations"]
+        api_model, guideline_model = resolve_api_model(run.get("model") or "", default_model)
+        model = api_model
+        target_model = guideline_model
 
         openai_tools = build_openai_tools(uc["tools"])
         current_prompt = uc["prompt"]["content"]
@@ -740,7 +880,8 @@ def run_optimization(run_id: int, uc_id: int):
                 if _should_stop(run_id):
                     break
                 eq.put({"type": "eval_start", "tc_id": tc_id})
-                ev = evaluate_transcript(result, tc["pass_criteria"], client, model)
+                ev = evaluate_transcript(result, tc["pass_criteria"], client, model,
+                                          use_case_id=uc_id, test_id=tc_id)
 
                 overall = ev.get("overall", "ERROR")
                 if overall == "PASS":
@@ -766,7 +907,9 @@ def run_optimization(run_id: int, uc_id: int):
             if passed < total and not _should_stop(run_id):
                 eq.put({"type": "diagnosing", "run_id": run_id, "n": n})
                 failed = [r for r in iter_results if r["overall"] != "PASS"]
-                diagnosis, new_prompt = diagnose_and_repair(current_prompt, failed, client, model, uc)
+                diagnosis, new_prompt = diagnose_and_repair(
+                    current_prompt, failed, client, model, uc, target_model=target_model
+                )
                 diff = compute_diff(current_prompt, new_prompt)
             else:
                 diff = []
@@ -784,10 +927,14 @@ def run_optimization(run_id: int, uc_id: int):
             eq.put(iter_event)
 
             if passed == total:
-                db.save_prompt(uc_id, new_prompt, create_version=True, label="optimized")
+                final_prompt = format_prompt_presentation(
+                    new_prompt if new_prompt != current_prompt else current_prompt,
+                    client, model, target_model,
+                )
+                db.save_prompt(uc_id, final_prompt, create_version=True, label="optimized")
                 db.update_run(run_id, status="done", ended_at=datetime.now().isoformat(), current_pass=passed)
                 eq.put({"type": "done", "run_id": run_id, "passed": passed, "total": total,
-                        "iterations": n, "final_prompt": current_prompt})
+                        "iterations": n, "final_prompt": final_prompt})
                 return
 
             if mode == "step" and not _should_stop(run_id):

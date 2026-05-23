@@ -1,5 +1,11 @@
 node_modules/
 .env
-lab_config.jsonlocal_test_runner.py
-.venv/
 lab_config.json
+local_test_runner.py
+.venv/
+__pycache__/
+*.pyc
+lab.db
+.claude/
+knowledge/
+knowledge/

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Prompt Optimization Lab</title>
+<title>Prompt Lab</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
@@ -132,6 +132,215 @@ select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(37,99,235,
 .sidebar-tab:hover:not(.active) { color: var(--text-2); background: var(--surface-2); }
 .sidebar-tab.active { color: var(--brand); border-color: var(--brand); font-weight: 600; }
 
+/* ── App chrome (header + stepper + sub-nav) ────────────────── */
+#app-chrome { background: var(--surface); border-bottom: 1px solid var(--border); }
+
+.app-top-bar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 20px; height: 50px;
+}
+.app-brand {
+  display: flex; align-items: center; gap: 10px; shrink: 0;
+}
+.app-brand-icon {
+  width: 30px; height: 30px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--brand); color: #fff;
+  font-size: 14px; font-weight: 700;
+}
+.app-brand-text {
+  font-size: 15px; font-weight: 600; color: var(--text-1);
+  letter-spacing: -.02em;
+}
+
+.app-agent-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.app-agent-wrap #uc-trigger {
+  min-width: 200px; max-width: 280px;
+  padding: 7px 12px; font-size: 13px;
+  border-radius: 8px;
+}
+
+.app-actions {
+  display: flex; align-items: center; gap: 8px;
+  margin-left: auto; flex-shrink: 0;
+}
+
+.btn-run-options {
+  padding: 7px 14px; font-size: 13px; font-weight: 500;
+  background: var(--surface); color: var(--text-1);
+  border: 1px solid var(--border-md); border-radius: 8px;
+  cursor: pointer; transition: background .14s, border-color .14s;
+}
+.btn-run-options:hover { background: var(--surface-2); border-color: #9ca3af; }
+
+.run-menu-panel { min-width: 260px; padding: 8px; }
+.run-model-select {
+  width: 100%; padding: 6px 8px; font-size: 12px;
+  border: 1px solid var(--border-md); border-radius: 6px;
+  background: var(--surface); color: var(--text-1);
+}
+.run-model-hint { font-size: 10px; color: var(--text-4); line-height: 1.4; margin-top: 4px; }
+.run-menu-section {
+  padding: 8px 10px; border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.run-menu-section:last-child { border-bottom: none; margin-bottom: 0; }
+.run-menu-section-title {
+  font-size: 10px; font-weight: 700; color: var(--text-4);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px;
+}
+
+/* ── 3-step workflow stepper ───────────────────────────────── */
+.workflow-stepper {
+  display: flex; align-items: center; gap: 0;
+  padding: 0 20px; height: 44px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.stepper-step {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 4px 12px; margin-right: 4px;
+  border: none; background: transparent; cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color .14s, border-color .14s;
+  color: var(--text-4); font-size: 13px; font-weight: 500;
+  font-family: inherit;
+}
+.stepper-step:hover { color: var(--text-2); }
+.stepper-step.is-active {
+  color: var(--brand); border-bottom-color: var(--brand); font-weight: 600;
+}
+.stepper-num {
+  width: 20px; height: 20px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+  border: 1.5px solid var(--border-md);
+  color: var(--text-4); background: var(--surface);
+  transition: all .14s;
+}
+.stepper-step.is-active .stepper-num {
+  border-color: var(--brand); color: var(--brand); background: var(--brand-light);
+}
+.stepper-arrow {
+  color: var(--text-4); font-size: 14px; padding: 0 10px;
+  user-select: none; line-height: 1;
+}
+
+/* ── Sub-navigation row ────────────────────────────────────── */
+.sub-nav-bar {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 0 20px; min-height: 40px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  gap: 16px;
+}
+.subnav-left { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.subnav-tabs { display: flex; align-items: stretch; gap: 0; }
+.subnav-hint {
+  font-size: 12px; color: var(--text-4); padding: 6px 0 10px;
+  line-height: 1.45; margin: 0;
+}
+.subnav-hint strong { color: var(--text-2); font-weight: 600; }
+
+.subnav-memory {
+  display: flex; align-items: center; gap: 12px;
+  padding-top: 6px; flex-shrink: 0;
+}
+.memory-label {
+  font-size: 10px; font-weight: 700; letter-spacing: .08em;
+  color: #6d28d9; text-transform: uppercase;
+}
+
+/* ── Sub-tabs (page tabs under stepper) ────────────────────── */
+.top-tab, .sub-tab {
+  padding: 8px 14px 10px; font-size: 13px; font-weight: 500;
+  border: none; border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--text-3); cursor: pointer; white-space: nowrap;
+  background: transparent; transition: color .14s, border-color .14s, background .14s;
+  display: inline-flex; align-items: center; font-family: inherit;
+}
+.top-tab:hover:not(.active), .sub-tab:hover:not(.active) { color: var(--text-1); }
+.top-tab.active, .sub-tab.active {
+  color: var(--brand); border-bottom-color: var(--brand);
+  font-weight: 600; background: var(--brand-light);
+}
+.subnav-memory .top-tab.active {
+  color: #6d28d9; border-bottom-color: #7c3aed;
+  background: #f5f3ff;
+}
+
+/* ── Tests panel footer (Run Tests) ─────────────────────────── */
+.tests-panel-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Config-page layout (Reqs / Vars / Tools / Curr Prompt) ─── */
+.config-page {
+  background: var(--surface-2);
+  padding: 32px 24px 48px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.config-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.03);
+}
+.config-card-header {
+  padding: 22px 28px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.config-card-body {
+  padding: 22px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.config-card-footer {
+  padding: 14px 28px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.config-page-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin: 0;
+  letter-spacing: -.01em;
+}
+.config-page-subtitle {
+  font-size: 12.5px;
+  color: var(--text-3);
+  margin: 4px 0 0;
+  line-height: 1.55;
+}
+.config-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* ── Transcript entries ─────────────────────────────────────── */
 .turn-user {
   background: var(--brand-light); border: 1px solid var(--brand-border);
@@ -160,6 +369,197 @@ pre { white-space: pre-wrap; word-break: break-word; }
 .diff-remove { background: var(--error-bg);   color: #b91c1c; }
 .diff-header { color: var(--text-4); font-style: italic; background: var(--surface-3); }
 .diff-context{ color: var(--text-3); background: transparent; }
+.diff-w-add  { background: #bbf7d0; color: #14532d; border-radius: 2px; padding: 0 1px; }
+.diff-w-rm   { background: #fecaca; color: #7f1d1d; border-radius: 2px; padding: 0 1px; text-decoration: line-through; text-decoration-color: #dc2626; }
+.diff-line-add  { background: #f0fdf4; }
+.diff-line-rm   { background: #fef2f2; }
+.diff-line-chg  { background: #fffbeb; }
+.diff-line-empty{ background: #f9fafb; min-height: 1.6em; }
+.cmp-row { display: flex; padding: 1px 0; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; line-height: 1.65; border-bottom: 1px solid #f3f4f6; }
+.cmp-ln { color: #9ca3af; user-select: none; width: 42px; flex-shrink: 0; text-align: right; padding: 0 10px 0 4px; }
+.cmp-txt { flex: 1; white-space: pre-wrap; word-break: break-word; padding-right: 12px; }
+.cmp-grid { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+.cmp-col-hdr { padding: 6px 12px; font-size: 11px; font-weight: 600; color: #6b7280; background: #f9fafb; border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; z-index: 2; }
+.cmp-mode-btn.active { background: #eef2ff !important; color: #3730a3 !important; font-weight: 600; }
+.cmp-mode-btn { background: white; color: #6b7280; }
+
+/* ── Prompt MD preview (Yellow.ai style) ───────────────────── */
+.prompt-preview {
+  font-size: 13px; line-height: 1.65; color: #111827; padding: 16px 20px;
+  overflow-y: auto; height: 100%;
+}
+.prompt-preview h1 { font-size: 1.35rem; font-weight: 700; margin: 0 0 14px; color: #111827; letter-spacing: -0.01em; }
+.prompt-preview h2 { font-size: 1.08rem; font-weight: 700; margin: 20px 0 10px; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; }
+.prompt-preview h3 { font-size: 0.98rem; font-weight: 600; margin: 16px 0 8px; color: #1f2937; }
+.prompt-preview h4 { font-size: 0.9rem; font-weight: 600; margin: 12px 0 6px; color: #374151; }
+.prompt-preview p { margin: 0 0 10px; }
+.prompt-preview ul, .prompt-preview ol { margin: 0 0 10px 20px; padding: 0; }
+.prompt-preview li { margin-bottom: 4px; }
+.prompt-preview hr { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
+.prompt-preview strong { font-weight: 600; color: #111827; }
+.prompt-preview code.yai-var {
+  background: #eff6ff; color: #1d4ed8; padding: 1px 6px; border-radius: 4px;
+  font-size: 12px; font-family: 'SFMono-Regular', Consolas, monospace;
+}
+.yai-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
+  margin: 2px 2px 2px 0; vertical-align: middle; white-space: nowrap;
+}
+.yai-chip-workflow { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
+.yai-chip-media    { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+.yai-chip-icon { font-size: 11px; opacity: 0.85; }
+.prompt-source-pane {
+  font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; line-height: 1.65;
+  padding: 12px 14px; overflow: auto; height: 100%; margin: 0;
+  background: #fafafa; color: #374151; white-space: pre-wrap; word-break: break-word;
+  border-right: 1px solid #e5e7eb;
+}
+/* ── Overleaf-style version viewer (main pane) ─────────────── */
+#version-editor-pane:not(.hidden) {
+  flex: 1; display: flex; flex-direction: column; min-height: 0;
+  background: var(--surface); border-left: 1px solid var(--border);
+}
+#version-editor-pane.hidden { display: none !important; }
+.ver-editor-toolbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 16px; height: 40px; shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.ver-toolbar-title { font-size: 13px; font-weight: 600; color: var(--text-1); }
+.ver-split-wrap {
+  flex: 1; display: flex; min-height: 0; overflow: hidden;
+  background: var(--surface);
+}
+.ver-md-col, .ver-preview-col {
+  display: flex; flex-direction: column; min-height: 0; min-width: 180px;
+  overflow: hidden;
+}
+.ver-md-col { flex: 0 0 50%; background: #fafafa; }
+.ver-preview-col { flex: 1; background: #fff; }
+.ver-pane-label {
+  flex-shrink: 0; padding: 6px 14px;
+  font-size: 11px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-3);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.ver-md-body {
+  flex: 1; display: flex; min-height: 0; overflow: hidden;
+}
+.ver-line-nums {
+  flex-shrink: 0; width: 42px; padding: 14px 8px 14px 12px;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 11px; line-height: 1.65; color: #9ca3af;
+  text-align: right; user-select: none; overflow: hidden;
+  border-right: 1px solid #e5e7eb; background: #f3f4f6;
+}
+.ver-md-pane {
+  flex: 1; margin: 0; padding: 14px 16px;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px; line-height: 1.65; color: #1f2937;
+  white-space: pre-wrap; word-break: break-word;
+  overflow: auto; background: #fafafa; border: none;
+}
+.ver-preview-pane {
+  flex: 1; overflow: auto; min-height: 0;
+}
+.ver-preview-pane .prompt-preview { height: auto; min-height: 100%; }
+.ver-split-handle {
+  flex-shrink: 0; width: 8px; cursor: col-resize;
+  background: var(--surface-2);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s;
+  position: relative; z-index: 2;
+}
+.ver-split-handle:hover, .ver-split-handle.is-dragging {
+  background: #e0e7ff;
+}
+.ver-split-grip {
+  width: 4px; height: 32px; border-radius: 2px;
+  background: #cbd5e1;
+  box-shadow: -1px 0 0 #94a3b8, 1px 0 0 #94a3b8;
+}
+.ver-split-handle:hover .ver-split-grip,
+.ver-split-handle.is-dragging .ver-split-grip {
+  background: #818cf8;
+  box-shadow: none;
+}
+
+/* ── Versions sidebar (narrow control panel) ───────────────── */
+.ver-sidebar {
+  padding: 14px 12px 12px;
+  gap: 10px;
+  background: var(--surface);
+}
+.ver-sidebar-title {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-4);
+}
+.ver-trigger {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 10px; border: 1px solid var(--border-md); border-radius: 8px;
+  background: var(--surface); cursor: pointer; text-align: left;
+  transition: border-color .14s, box-shadow .14s;
+}
+.ver-trigger:hover { border-color: #9ca3af; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.ver-trigger-main { flex: 1; min-width: 0; }
+.ver-trigger-v {
+  display: block; font-size: 14px; font-weight: 600; color: var(--text-1);
+  line-height: 1.3;
+}
+.ver-trigger-sub {
+  display: block; font-size: 11px; color: var(--text-4); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ver-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--surface); border: 1px solid var(--border-md);
+  border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  z-index: 50; overflow: hidden;
+}
+.ver-dropdown-search { padding: 8px; border-bottom: 1px solid var(--border); }
+.ver-dropdown-search input {
+  width: 100%; padding: 6px 8px; font-size: 12px;
+  border: 1px solid var(--border); border-radius: 6px;
+}
+.ver-dropdown-list { max-height: min(280px, 50vh); overflow-y: auto; padding: 4px; }
+.ver-dd-item {
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  padding: 8px 10px; border: none; border-radius: 7px;
+  background: transparent; cursor: pointer; text-align: left;
+  transition: background .12s;
+}
+.ver-dd-item:hover { background: var(--surface-2); }
+.ver-dd-item.is-selected { background: var(--brand-light); }
+.ver-dd-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ver-dd-v { font-size: 13px; font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; }
+.ver-dd-star { font-size: 10px; font-weight: 600; color: #166534; background: #dcfce7; padding: 1px 6px; border-radius: 9999px; }
+.ver-dd-label { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 9999px; }
+.ver-dd-label.opt { background: #eff6ff; color: #1d4ed8; }
+.ver-dd-label.inp { background: #f0fdf4; color: #15803d; }
+.ver-dd-ts { font-size: 11px; color: var(--text-4); }
+.btn-ver-compare {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; padding: 8px 12px; font-size: 13px; font-weight: 600;
+  color: var(--brand); background: var(--brand-light);
+  border: 1px solid var(--brand-border); border-radius: 8px;
+  cursor: pointer; transition: background .14s, border-color .14s;
+}
+.btn-ver-compare:hover { background: #dbeafe; border-color: #93c5fd; }
+.ver-meta-card {
+  padding: 10px 12px; border-radius: 8px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.ver-meta-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ver-meta-stat { font-size: 11px; color: var(--text-3); line-height: 1.45; }
+.ver-meta-stat strong { color: var(--text-1); font-weight: 600; }
+.ver-hint { font-size: 10px; color: var(--text-4); line-height: 1.45; margin: 0; }
+.ver-sidebar-footer { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
 
 /* ── Test list item ─────────────────────────────────────────── */
 .test-item {
@@ -203,208 +603,403 @@ pre { white-space: pre-wrap; word-break: break-word; }
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
 
-<!-- ══ Header ════════════════════════════════════════════════════════════════ -->
-<header class="flex items-center gap-3 px-5 py-0 border-b border-gray-200 bg-white shrink-0 shadow-sm" style="height:56px">
+<!-- ══ App chrome ══════════════════════════════════════════════════════════════ -->
+<div id="app-chrome" class="shrink-0">
 
-  <!-- Logo + brand -->
-  <div class="flex items-center gap-2.5 shrink-0">
-    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0" style="background:var(--brand)">P</div>
-    <span class="font-semibold text-gray-800 text-sm tracking-tight">Prompt Optimization Lab</span>
-  </div>
-
-  <div class="w-px h-5 bg-gray-200 shrink-0 mx-1"></div>
-
-  <!-- Use case selector (custom dropdown) -->
-  <div class="flex items-center gap-1.5 relative">
-    <button id="uc-trigger" type="button" onclick="toggleUcDropdown(event)"
-            class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:border-gray-300 text-gray-800 text-[13px] min-w-[200px] max-w-[280px] transition">
-      <span id="uc-trigger-name" class="truncate flex-1 text-left text-gray-400">Select agent…</span>
-      <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-    </button>
-    <div id="uc-dropdown" class="hidden absolute top-full left-0 mt-1.5 w-[340px] bg-white rounded-xl shadow-2xl border border-gray-200 z-40 overflow-hidden">
-      <div class="px-3 py-2 border-b border-gray-100">
-        <input id="uc-search" type="text" placeholder="Search agents…" oninput="renderUcDropdown()"
-               class="w-full text-[13px] px-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:border-gray-400" style="box-shadow:none"/>
-      </div>
-      <div id="uc-dropdown-list" class="max-h-[320px] overflow-y-auto py-1"></div>
-      <div class="border-t border-gray-100 flex">
-        <button onclick="closeUcDropdown(); openNewUcModal();"
-                class="flex-1 px-3 py-2.5 text-[13px] text-gray-600 hover:bg-gray-50 flex items-center gap-1.5 justify-center font-medium">
-          <span class="text-base leading-none">+</span> New agent
-        </button>
-        <div class="w-px bg-gray-100"></div>
-        <button onclick="closeUcDropdown(); openManageUcModal();"
-                class="flex-1 px-3 py-2.5 text-[13px] text-gray-600 hover:bg-gray-50 font-medium">
-          Manage agents
-        </button>
-      </div>
+  <!-- Top bar -->
+  <div class="app-top-bar">
+    <div class="app-brand">
+      <div class="app-brand-icon">P</div>
+      <span class="app-brand-text">Prompt Lab</span>
     </div>
-    <button onclick="openManageUcModal()" class="btn btn-ghost btn-sm" title="Manage agents" style="padding:5px 8px">⚙</button>
+
+    <div class="app-agent-wrap relative">
+      <button id="uc-trigger" type="button" onclick="toggleUcDropdown(event)"
+              class="flex items-center gap-2 border border-gray-200 bg-white hover:border-gray-300 text-gray-800 transition w-full">
+        <span id="uc-trigger-name" class="truncate flex-1 text-left text-gray-400">Select agent…</span>
+        <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+      </button>
+      <div id="uc-dropdown" class="hidden absolute top-full left-0 mt-1.5 w-[340px] bg-white rounded-xl shadow-2xl border border-gray-200 z-40 overflow-hidden">
+        <div class="px-3 py-2 border-b border-gray-100">
+          <input id="uc-search" type="text" placeholder="Search agents…" oninput="renderUcDropdown()"
+                 class="w-full text-[13px] px-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:border-gray-400" style="box-shadow:none"/>
+        </div>
+        <div id="uc-dropdown-list" class="max-h-[320px] overflow-y-auto py-1"></div>
+        <div class="border-t border-gray-100 flex">
+          <button onclick="closeUcDropdown(); openNewUcModal();"
+                  class="flex-1 px-3 py-2.5 text-[13px] text-gray-600 hover:bg-gray-50 flex items-center gap-1.5 justify-center font-medium">
+            <span class="text-base leading-none">+</span> New agent
+          </button>
+          <div class="w-px bg-gray-100"></div>
+          <button onclick="closeUcDropdown(); openManageUcModal();"
+                  class="flex-1 px-3 py-2.5 text-[13px] text-gray-600 hover:bg-gray-50 font-medium">
+            Manage agents
+          </button>
+        </div>
+      </div>
+      <button onclick="openManageUcModal()" title="Manage agents"
+        class="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 hover:bg-gray-50 text-gray-400 hover:text-gray-600 transition shrink-0">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+      </button>
+    </div>
+
+    <div class="app-actions">
+      <div class="relative" id="run-split">
+        <button id="btn-run-menu" onclick="toggleRunMenu(event)" class="btn-run-options">Run options</button>
+        <div id="run-menu" class="hidden absolute right-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-lg z-30 run-menu-panel" style="top:100%">
+          <div class="run-menu-section">
+            <div class="run-menu-section-title">Target model</div>
+            <select id="opt-model-select" class="run-model-select" onchange="saveOptModel()"></select>
+            <p id="opt-model-hint" class="run-model-hint">Prompts are optimized with model-specific guidelines.</p>
+          </div>
+          <div class="run-menu-section">
+            <div class="run-menu-section-title">Optimization</div>
+            <div class="flex items-center gap-2 mb-2">
+              <div class="flex items-center gap-0.5 bg-gray-100 border border-gray-200 rounded-md p-0.5 flex-1">
+                <button id="mode-auto" onclick="setMode('auto')" class="mode-btn active flex-1">Auto</button>
+                <button id="mode-step" onclick="setMode('step')" class="mode-btn flex-1">Step</button>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <span class="text-[11px] text-gray-500">Max</span>
+                <input id="max-iter-input" type="number" min="1" max="20" value="10" style="width:44px;padding:4px 6px;font-size:12px"/>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button id="btn-optimize" onclick="startOptimize()" class="btn btn-primary btn-sm">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046a1 1 0 011.97.242l.64 4.243 4.243.64a1 1 0 01.242 1.97l-4.243.64-.64 4.243a1 1 0 01-1.97-.242l-.64-4.243-4.243-.64a1 1 0 01-.242-1.97l4.243-.64.64-4.243zM5 13a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+        Optimize
+      </button>
+      <button onclick="openSettings()" title="Settings"
+        class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.19 2.042-.947 2.287-1.56.38-1.56 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.38 1.56 2.6 1.56 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.56-.38 1.56-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+      </button>
+    </div>
   </div>
 
-  <div class="flex-1"></div>
+  <!-- 3-step workflow stepper -->
+  <nav id="workflow-stepper" class="workflow-stepper" aria-label="Workflow">
+    <button type="button" class="stepper-step" data-step="setup" onclick="goToStep('setup')">
+      <span class="stepper-num">1</span> Setup
+    </button>
+    <span class="stepper-arrow" aria-hidden="true">›</span>
+    <button type="button" class="stepper-step is-active" data-step="testfix" onclick="goToStep('testfix')">
+      <span class="stepper-num">2</span> Test &amp; fix
+    </button>
+    <span class="stepper-arrow" aria-hidden="true">›</span>
+    <button type="button" class="stepper-step" data-step="validate" onclick="goToStep('validate')">
+      <span class="stepper-num">3</span> Live validate
+    </button>
+  </nav>
 
-  <!-- Score badge -->
-  <div id="score-badge" class="hidden items-center gap-1.5 px-3 py-1 rounded-lg bg-gray-50 border border-gray-200">
-    <span id="score-pass" class="text-sm font-bold" style="color:var(--success)">0</span>
-    <span class="text-gray-400 text-sm">/</span>
-    <span id="score-total" class="text-sm font-semibold text-gray-700">0</span>
-    <span class="text-gray-400 text-xs ml-0.5">passing</span>
+  <!-- Sub-navigation: contextual tabs + memory -->
+  <div id="top-tabs" class="sub-nav-bar">
+    <div class="subnav-left">
+      <div id="subnav-setup" class="subnav-tabs hidden" role="tablist">
+        <button class="sub-tab top-tab" id="stab-reqs"       onclick="showSideTab('reqs')">Requirements</button>
+        <button class="sub-tab top-tab" id="stab-variables"  onclick="showSideTab('variables')">Variables</button>
+        <button class="sub-tab top-tab" id="stab-tools"      onclick="showSideTab('tools')">Tools</button>
+        <button class="sub-tab top-tab" id="stab-currprompt" onclick="showSideTab('currprompt')">Prompt</button>
+      </div>
+      <div id="subnav-testfix" class="subnav-tabs" role="tablist">
+        <button class="sub-tab top-tab active" id="stab-tests"  onclick="showSideTab('tests')">Tests</button>
+        <button class="sub-tab top-tab" id="stab-runs"   onclick="showSideTab('runs')">Runs</button>
+        <button class="sub-tab top-tab" id="stab-prompt" onclick="showSideTab('prompt')">Versions</button>
+      </div>
+      <div id="subnav-validate" class="subnav-tabs hidden" role="tablist">
+        <button class="sub-tab top-tab" id="stab-livetest" onclick="showSideTab('livetest')">Live bot</button>
+      </div>
+      <p id="subnav-hint" class="subnav-hint hidden">
+        Validate on the <strong>live Yellow.ai bot</strong> (Playwright). Slower, but matches production behavior.
+      </p>
+    </div>
+    <div class="subnav-memory" role="tablist" aria-label="Memory">
+      <span class="memory-label">Memory</span>
+      <button class="top-tab" id="stab-rules" onclick="showSideTab('rules')">Rules</button>
+      <button class="top-tab" id="stab-knowledge" onclick="showSideTab('knowledge')">Knowledge</button>
+    </div>
   </div>
-
-  <!-- Mode toggle -->
-  <div class="flex items-center gap-0.5 bg-gray-100 border border-gray-200 rounded-lg p-0.5">
-    <button id="mode-auto" onclick="setMode('auto')" class="mode-btn active">Auto</button>
-    <button id="mode-step" onclick="setMode('step')" class="mode-btn">Step</button>
-  </div>
-
-  <!-- Max iterations -->
-  <div class="flex items-center gap-1.5">
-    <span class="text-xs text-gray-400 shrink-0">Max iter.</span>
-    <input id="max-iter-input" type="number" min="1" max="20" value="10"
-      style="width:52px;padding:5px 8px;font-size:13px;text-align:center"/>
-  </div>
-
-  <!-- Action buttons -->
-  <button id="btn-run-all" onclick="runAll()" class="btn btn-ghost btn-sm">▶ Run Tests</button>
-  <button id="btn-rerun-failed" onclick="rerunFailed()" class="hidden btn btn-ghost btn-sm" style="color:var(--warning);border-color:var(--warning-bd);background:var(--warning-bg)">↺ Failed</button>
-  <button id="btn-optimize" onclick="startOptimize()" class="btn btn-primary btn-sm">⚡ Optimize</button>
-
-  <div class="w-px h-5 bg-gray-200 shrink-0 mx-0.5"></div>
-  <a href="/live-bot" title="Live Bot Test"
-    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition"
-    style="background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-bd)"
-    onmouseover="this.style.background='#ede9fe'" onmouseout="this.style.background='var(--purple-bg)'">
-    🤖 Live Bot Test
-  </a>
-  <div class="w-px h-5 bg-gray-200 shrink-0 mx-0.5"></div>
-  <button onclick="openSettings()" title="Settings"
-    class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition text-base">⚙</button>
-</header>
+</div>
 
 <!-- ══ Layout ════════════════════════════════════════════════════════════════ -->
-<div class="flex flex-1 min-h-0">
+<div id="main-layout" class="flex flex-1 min-h-0">
 
 <!-- ── Sidebar ──────────────────────────────────────────────────────────────── -->
 <aside id="sidebar" class="shrink-0 border-r border-gray-200 bg-white flex flex-col" style="width:420px;min-width:260px;max-width:900px">
 
-  <!-- Sidebar tab bar -->
-  <div class="flex border-b border-gray-200 shrink-0 bg-gray-50">
-    <button class="sidebar-tab active" id="stab-tests"     onclick="showSideTab('tests')">Tests</button>
-    <button class="sidebar-tab"        id="stab-reqs"      onclick="showSideTab('reqs')">Reqs</button>
-    <button class="sidebar-tab"        id="stab-variables" onclick="showSideTab('variables')">Vars</button>
-    <button class="sidebar-tab"        id="stab-tools"       onclick="showSideTab('tools')">Tools</button>
-    <button class="sidebar-tab"        id="stab-currprompt" onclick="showSideTab('currprompt')">Curr Prompt</button>
-    <button class="sidebar-tab"        id="stab-prompt"     onclick="showSideTab('prompt')">Versions</button>
-    <button class="sidebar-tab"        id="stab-runs"       onclick="showSideTab('runs')">Runs</button>
+  <!-- Tests panel -->
+  <div id="spanel-tests" class="flex-1 min-h-0 flex flex-col">
+    <div id="test-list" class="flex-1 overflow-y-auto scrollbar-thin min-h-0"></div>
+    <div class="tests-panel-footer">
+      <button id="btn-run-all" onclick="runAll()" class="btn btn-primary w-full" style="font-size:12px;padding:8px 12px">
+        ▶&nbsp; Run Tests
+      </button>
+      <button id="btn-rerun-failed" onclick="rerunFailed()" class="hidden btn btn-ghost btn-sm w-full" style="color:var(--warning);border-color:var(--warning-bd);background:var(--warning-bg)">
+        ↺&nbsp; Re-run failed
+      </button>
+    </div>
   </div>
 
-  <!-- Tests panel -->
-  <div id="spanel-tests" class="flex-1 overflow-y-auto scrollbar-thin">
-    <div id="test-list"></div>
-  </div>
 
   <!-- Requirements panel -->
-  <div id="spanel-reqs" class="hidden flex-1 flex flex-col min-h-0 p-3 gap-2.5">
-    <textarea id="reqs-editor"
-      class="flex-1 mono scrollbar-thin"
-      style="font-size:12px; line-height:1.6"
-      placeholder="Describe the agent's business requirements in plain language…"></textarea>
-    <button onclick="saveReqs()" class="btn btn-ghost btn-sm w-full">Save Requirements</button>
-    <button onclick="generateTests()" id="btn-gen-tests" class="btn btn-primary btn-sm w-full">⚡ Generate Tests (Requirements + Prompt)</button>
-    <p id="reqs-status" class="text-xs text-center text-gray-400 min-h-[16px]"></p>
+  <div id="spanel-reqs" class="hidden flex-1 config-page">
+    <div class="config-card">
+      <div class="config-card-header">
+        <h2 class="config-page-title">Requirements</h2>
+        <p class="config-page-subtitle">Plain-language description of what this agent should do. Used to auto-generate test cases and guide prompt optimization. Be specific about flows, edge cases, and constraints.</p>
+      </div>
+      <div class="config-card-body">
+        <textarea id="reqs-editor"
+          class="flex-1 mono scrollbar-thin"
+          style="font-size:13px; line-height:1.7; min-height:340px; padding:14px 16px"
+          placeholder="Example:&#10;&#10;• Recommend Royal Enfield motorcycles based on the rider's use case (city, touring, off-road, cruising, performance).&#10;• Ask for budget, mileage, and rider fit if the user hasn't mentioned them.&#10;• If the user requests booking or pricing, route to the Booking agent.&#10;• Do not invent specs, prices, or availability.&#10;"></textarea>
+      </div>
+      <div class="config-card-footer">
+        <p id="reqs-status" class="text-xs text-gray-400 flex-1"></p>
+        <button onclick="saveReqs()" class="btn btn-ghost btn-sm">Save</button>
+        <button onclick="generateTests()" id="btn-gen-tests" class="btn btn-primary btn-sm">⚡ Generate Tests</button>
+      </div>
+    </div>
   </div>
 
   <!-- Variables panel -->
-  <div id="spanel-variables" class="hidden flex-1 overflow-y-auto scrollbar-thin p-3 flex flex-col gap-4">
-    <div>
-      <div class="label mb-2">Sub-agents / Routing</div>
-      <div id="sa-list" class="space-y-2"></div>
-      <button onclick="addSubAgent()" class="btn btn-ghost btn-sm w-full mt-2">+ Add Agent</button>
-    </div>
-    <div>
-      <div class="label mb-2">Rich Media</div>
-      <div id="rm-list" class="space-y-2"></div>
-      <button onclick="addRichMedia()" class="btn btn-ghost btn-sm w-full mt-2">+ Add Rich Media</button>
-    </div>
-    <div>
-      <div class="label mb-2">Memory Keys / Variables</div>
-      <div id="mk-list" class="space-y-2"></div>
-      <button onclick="addMemoryKey()" class="btn btn-ghost btn-sm w-full mt-2">+ Add Variable</button>
-    </div>
-    <div class="mt-auto pt-2 border-t border-gray-100">
-      <button onclick="saveVariables()" class="btn btn-primary btn-sm w-full">Save Variables</button>
-      <p id="vars-status" class="text-xs text-center text-gray-400 mt-1.5 min-h-[16px]"></p>
+  <div id="spanel-variables" class="hidden flex-1 config-page">
+    <div class="config-card">
+      <div class="config-card-header">
+        <h2 class="config-page-title">Variables &amp; Routing</h2>
+        <p class="config-page-subtitle">Define sub-agents the prompt can route to, rich-media widgets it can render, and memory keys it can read/write. Names here are the exact references the prompt and tests will use.</p>
+      </div>
+      <div class="config-card-body" style="gap:20px">
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:16px 20px">
+          <h3 class="config-section-title">🔀 Sub-agents / Routing</h3>
+          <div id="sa-list" class="space-y-2"></div>
+          <button onclick="addSubAgent()" class="btn btn-ghost btn-sm mt-3">+ Add Sub-agent</button>
+        </div>
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:16px 20px">
+          <h3 class="config-section-title">🎨 Rich Media</h3>
+          <div id="rm-list" class="space-y-2"></div>
+          <button onclick="addRichMedia()" class="btn btn-ghost btn-sm mt-3">+ Add Rich Media</button>
+        </div>
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:16px 20px">
+          <h3 class="config-section-title">💾 Memory Keys / Variables</h3>
+          <div id="mk-list" class="space-y-2"></div>
+          <button onclick="addMemoryKey()" class="btn btn-ghost btn-sm mt-3">+ Add Variable</button>
+        </div>
+      </div>
+      <div class="config-card-footer">
+        <p id="vars-status" class="text-xs text-gray-400 flex-1"></p>
+        <button onclick="saveVariables()" class="btn btn-primary btn-sm">Save Variables</button>
+      </div>
     </div>
   </div>
 
   <!-- Tools panel -->
-  <div id="spanel-tools" class="hidden flex-1 overflow-y-auto scrollbar-thin p-3 flex flex-col gap-2.5">
-    <div id="tools-list" class="space-y-2.5"></div>
-    <button onclick="addTool()" class="btn btn-ghost btn-sm w-full">+ Add Tool</button>
-    <div class="mt-auto pt-2 border-t border-gray-100">
-      <button onclick="saveTools()" class="btn btn-primary btn-sm w-full">Save Tools</button>
-      <p id="tools-status" class="text-xs text-center text-gray-400 mt-1.5 min-h-[16px]"></p>
+  <div id="spanel-tools" class="hidden flex-1 config-page">
+    <div class="config-card">
+      <div class="config-card-header">
+        <h2 class="config-page-title">Tools &amp; Workflows</h2>
+        <p class="config-page-subtitle">Register workflows the agent can call. Each tool's name and return schema is injected into both the agent prompt and the test generator — keep names exact.</p>
+      </div>
+      <div class="config-card-body">
+        <div id="tools-list" class="space-y-2.5"></div>
+        <button onclick="addTool()" class="btn btn-ghost btn-sm self-start">+ Add Tool</button>
+      </div>
+      <div class="config-card-footer">
+        <p id="tools-status" class="text-xs text-gray-400 flex-1"></p>
+        <button onclick="saveTools()" class="btn btn-primary btn-sm">Save Tools</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rules panel (acceptance rules — shows ALL agents grouped) -->
+  <div id="spanel-rules" class="hidden flex-1 config-page" style="padding:20px 24px 36px;overflow-y:auto">
+    <div style="max-width:980px;margin:0 auto">
+
+      <!-- Stage banner -->
+      <div class="flex items-start gap-3 rounded-lg px-4 py-3 mb-4" style="background:#eef2ff;border:1px solid #c7d2fe">
+        <span style="font-size:18px;line-height:1">📒</span>
+        <div style="flex:1">
+          <div class="text-sm font-semibold" style="color:#3730a3">Acceptance Memory</div>
+          <p class="text-xs leading-relaxed mt-0.5" style="color:#4338ca">
+            Human-approved exceptions the LLM consults when generating tests, judging responses, and repairing prompts.
+            Add a rule by clicking <b>“LLM was wrong — accept this”</b> on any failing criterion in <b>Tests</b> or <b>Live Test</b>.
+            Rules are scoped per agent.
+          </p>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="flex items-center gap-3 mb-3">
+        <input id="rules-search" type="text" placeholder="Search rules or agent names…"
+               class="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+               oninput="filterRulesList()">
+        <label class="flex items-center gap-1.5 text-xs text-gray-600 whitespace-nowrap">
+          <input type="checkbox" id="rules-show-inactive" onchange="renderRulesList()"> Show inactive
+        </label>
+        <button onclick="loadAcceptanceRulesList()" class="btn btn-ghost btn-sm">↻ Refresh</button>
+      </div>
+
+      <div id="rules-summary" class="text-xs text-gray-500 mb-2"></div>
+      <div id="rules-list" class="space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- Knowledge panel — accepted-test cases + LLM-derived judging rubric -->
+  <div id="spanel-knowledge" class="hidden flex-1 config-page" style="padding:20px 24px 36px;overflow-y:auto">
+    <div style="max-width:980px;margin:0 auto">
+
+      <!-- Banner -->
+      <div class="flex items-start gap-3 rounded-lg px-4 py-3 mb-4" style="background:#ecfdf5;border:1px solid #a7f3d0">
+        <span style="font-size:18px;line-height:1">📚</span>
+        <div style="flex:1">
+          <div class="text-sm font-semibold" style="color:#065f46">Accepted Test Knowledge</div>
+          <p class="text-xs leading-relaxed mt-0.5" style="color:#047857">
+            Upload a <b>JSON file</b> of human-accepted (PASS) test cases for the current agent.
+            The system distils it — plus your <b>Acceptance Rules</b> — into an SOP-style rubric the
+            evaluator reads before every simulation and live test, so judgement stays consistent.
+            For old PDF reports, convert first with <code style="background:rgba(0,0,0,.06);padding:1px 4px;border-radius:3px">scripts/pdf_to_json.py</code>.
+          </p>
+        </div>
+      </div>
+
+      <!-- No-agent-selected fallback -->
+      <div id="knowledge-no-agent" class="hidden text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg px-4 py-8 text-center">
+        Select an agent in the top bar to manage its knowledge base.
+      </div>
+
+      <!-- Per-agent knowledge controls -->
+      <div id="knowledge-content" class="hidden space-y-4">
+
+        <!-- Status row -->
+        <div class="rounded-lg border border-gray-200 bg-white p-4">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div class="text-xs uppercase tracking-wider text-gray-500">Current state</div>
+              <div id="knowledge-summary" class="text-sm text-gray-700 mt-1">Loading…</div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <label class="btn btn-primary btn-sm cursor-pointer">
+                ⬆ Upload
+                <input id="knowledge-upload-input" type="file" accept=".json,.pdf,application/json,application/pdf"
+                       class="hidden" onchange="uploadKnowledge(event)">
+              </label>
+              <button onclick="rebuildRubric()" class="btn btn-ghost btn-sm">↻ Rebuild rubric</button>
+              <button onclick="clearKnowledge()" class="btn btn-ghost btn-sm" style="color:#b91c1c">🗑 Clear</button>
+            </div>
+          </div>
+          <div id="knowledge-msg" class="text-xs mt-2"></div>
+        </div>
+
+        <!-- Rubric viewer -->
+        <div class="rounded-lg border border-gray-200 bg-white">
+          <div class="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+            <div class="text-sm font-medium text-gray-700">Judging Rubric (SOP)</div>
+            <div class="text-[11px] text-gray-400">injected into every evaluator prompt</div>
+          </div>
+          <pre id="knowledge-rubric" class="text-xs whitespace-pre-wrap p-4 leading-relaxed"
+               style="font-family:ui-monospace,Menlo,monospace;color:var(--text-2);max-height:520px;overflow:auto;margin:0">No rubric yet — upload accepted tests or add acceptance rules to seed it.</pre>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- Curr Prompt panel (primary editor — Optimize always uses this) -->
-  <div id="spanel-currprompt" class="hidden flex-1 flex flex-col min-h-0 p-3 gap-2">
-    <div class="rounded-md px-3 py-2 text-xs flex items-center gap-2 shrink-0" style="background:#fffbeb;border:1px solid #fde68a;color:#92400e">
-      ⚡ <strong>Optimize always starts from this prompt.</strong>&nbsp;Paste or edit here, then Save.
+  <div id="spanel-currprompt" class="hidden flex-1 config-page" style="padding:24px 24px 36px;min-height:100%"><div class="config-card" style="padding:18px 22px 14px;display:flex;flex-direction:column;flex:1">
+
+    <!-- Banner -->
+    <div class="shrink-0 flex items-center gap-2 rounded-lg px-3 py-2 mb-3" style="background:#fffbeb;border:1px solid #fde68a">
+      <span style="font-size:14px;line-height:1">⚡</span>
+      <span style="font-size:11.5px;color:#92400e;line-height:1.4">
+        <strong style="font-weight:600">Optimize always starts from this prompt.</strong>
+        <span style="color:#a16207"> Paste or edit here, then Save.</span>
+      </span>
     </div>
 
-    <!-- Trigger field -->
-    <div class="flex flex-col gap-1 shrink-0">
-      <label for="curr-trigger-editor" class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide">
-        Trigger
-        <span class="font-normal normal-case text-gray-400">— when this agent is invoked</span>
-      </label>
+    <!-- Trigger section -->
+    <div class="shrink-0 rounded-lg mb-3 overflow-hidden" style="border:1px solid var(--border)">
+      <div class="flex items-center justify-between px-3 py-2" style="background:var(--surface-3);border-bottom:1px solid var(--border)">
+        <span style="font-size:10.5px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.07em">Trigger</span>
+        <span style="font-size:10.5px;color:var(--text-4)">when this agent is invoked</span>
+      </div>
       <textarea id="curr-trigger-editor"
-        class="mono scrollbar-thin rounded-md border border-gray-200 px-2 py-1.5 resize-y"
-        style="font-size:11.5px; line-height:1.55; min-height:64px; max-height:180px; background:#fafafa"
+        class="mono scrollbar-thin"
+        style="font-size:11.5px;line-height:1.6;min-height:60px;max-height:160px;resize:vertical;border:none;border-radius:0;background:#fff;box-shadow:none"
         placeholder="Describe the user intent or condition that triggers this agent…"
         oninput="updateCurrPromptMeta()"></textarea>
     </div>
 
-    <!-- Prompt field -->
-    <label for="curr-prompt-editor" class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide shrink-0">
-      Agent Prompt
-    </label>
-    <textarea id="curr-prompt-editor"
-      class="flex-1 mono scrollbar-thin"
-      style="font-size:11.5px; line-height:1.65"
-      placeholder="Paste your current agent prompt here…"
-      oninput="updateCurrPromptMeta()"></textarea>
-    <div id="curr-prompt-meta" class="text-xs text-gray-400 shrink-0 min-h-[16px]"></div>
-    <div class="flex gap-1.5 flex-wrap shrink-0">
-      <button onclick="saveCurrPrompt()" class="btn btn-primary btn-sm flex-1" title="Overwrite current trigger + prompt — Optimize will use this">💾 Save</button>
-      <button onclick="saveCurrPromptVersion()" class="btn btn-sm flex-1" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe" title="Save as a new named version">+ Version</button>
-      <button onclick="parsePrompt()" class="btn btn-sm" style="background:var(--brand-light);color:var(--brand);border:1px solid var(--brand-border)">🔍 Parse</button>
-      <button onclick="openYaiMapModal()" class="btn btn-sm" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0">🗺 YAI</button>
+    <!-- Agent Prompt section -->
+    <div class="flex-1 flex flex-col min-h-0 rounded-lg overflow-hidden" style="border:1px solid var(--border)">
+      <div class="shrink-0 flex items-center justify-between px-3 py-2" style="background:var(--surface-3);border-bottom:1px solid var(--border)">
+        <span style="font-size:10.5px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.07em">Agent Prompt</span>
+        <span id="curr-prompt-meta" style="font-size:10.5px;color:var(--text-4);font-variant-numeric:tabular-nums"></span>
+      </div>
+      <textarea id="curr-prompt-editor"
+        class="flex-1 mono scrollbar-thin"
+        style="font-size:11.5px;line-height:1.65;border:none;border-radius:0;background:#fff;box-shadow:none;resize:none;min-height:calc(100vh - 380px)"
+        placeholder="Paste your current agent prompt here…"
+        oninput="updateCurrPromptMeta()"></textarea>
     </div>
-    <p id="curr-prompt-status" class="text-xs text-center text-gray-400 shrink-0 min-h-[14px]"></p>
-  </div>
 
-  <!-- Versions panel (read-only history viewer) -->
-  <div id="spanel-prompt" class="hidden flex-1 flex flex-col min-h-0 p-3 gap-2.5">
-    <div class="flex gap-2 items-center shrink-0">
-      <select id="prompt-version-select" onchange="loadPromptVersion(+this.value)" style="font-size:12px;padding:5px 10px;flex:1;"></select>
-      <button onclick="openCompareModal()" class="btn btn-sm shrink-0" style="background:#f3f4f6;border:1px solid #e5e7eb;color:#374151" title="Compare two versions side by side">⇄ Compare</button>
+    <!-- Actions -->
+    <div class="shrink-0 mt-3 flex flex-col gap-2">
+      <button onclick="saveCurrPrompt()" class="btn btn-primary w-full" style="font-size:13px;padding:8px 14px" title="Overwrite current trigger + prompt — Optimize will use this">
+        💾 Save
+      </button>
+      <div class="flex gap-1.5">
+        <button onclick="saveCurrPromptVersion()" class="btn btn-sm flex-1" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe" title="Save as a new named version">+ Version</button>
+        <button onclick="parsePrompt()" class="btn btn-sm flex-1" style="background:var(--brand-light);color:var(--brand);border:1px solid var(--brand-border)">🔍 Parse</button>
+        <button onclick="openYaiMapModal()" class="btn btn-sm flex-1" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0">🗺 YAI</button>
+      </div>
     </div>
-    <div id="prompt-version-meta" class="rounded-md px-3 py-2 text-xs flex items-center gap-3 flex-wrap shrink-0" style="background:var(--surface-2);border:1px solid var(--border)"></div>
-    <!-- Read-only display of selected version -->
-    <textarea id="prompt-editor" readonly
-      class="flex-1 mono scrollbar-thin"
-      style="font-size:11px; line-height:1.65; background:#f9fafb; color:#374151; cursor:default"
-      placeholder="Select a version above to preview its content…"></textarea>
-    <button onclick="loadVersionToCurrPrompt()" class="btn btn-primary btn-sm shrink-0">✏ Load to Curr Prompt &amp; Edit</button>
-    <p id="prompt-status" class="text-xs text-center text-gray-400 shrink-0 min-h-[14px]"></p>
+
+    <p id="curr-prompt-status" class="text-xs text-center text-gray-400 shrink-0 mt-1.5 min-h-[14px]"></p>
+  </div></div>
+
+  <!-- Versions panel (narrow sidebar controls) -->
+  <div id="spanel-prompt" class="hidden ver-sidebar flex-1 flex flex-col min-h-0">
+    <div class="ver-sidebar-title shrink-0">Prompt version</div>
+
+    <div class="relative shrink-0">
+      <button id="ver-trigger" type="button" onclick="toggleVerDropdown(event)" class="ver-trigger" title="Select version">
+        <div class="ver-trigger-main">
+          <span id="ver-trigger-v" class="ver-trigger-v">v—</span>
+          <span id="ver-trigger-sub" class="ver-trigger-sub">Select a version…</span>
+        </div>
+        <svg class="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+      </button>
+      <div id="ver-dropdown" class="ver-dropdown hidden">
+        <div class="ver-dropdown-search">
+          <input id="ver-search" type="text" placeholder="Search v1, v2…" oninput="renderVerDropdown()"/>
+        </div>
+        <div id="ver-dropdown-list" class="ver-dropdown-list scrollbar-thin"></div>
+      </div>
+      <input type="hidden" id="prompt-version-select" value=""/>
+    </div>
+
+    <button type="button" onclick="openCompareModal()" class="btn-ver-compare shrink-0" title="Compare two versions side by side">
+      <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h8a1 1 0 110 2H4a1 1 0 01-1-1zM14 8l3 3-3 3V8z"/></svg>
+      Compare versions
+    </button>
+
+    <div id="prompt-version-meta" class="ver-meta-card shrink-0"></div>
+
+    <p class="ver-hint shrink-0">Viewer is on the right — drag the center divider to resize Markdown vs Preview.</p>
+    <textarea id="prompt-editor" readonly class="hidden" aria-hidden="true"></textarea>
+    <div class="ver-sidebar-footer mt-auto shrink-0">
+      <button onclick="loadVersionToCurrPrompt()" class="btn btn-primary btn-sm w-full">✏ Load to Curr Prompt</button>
+      <p id="prompt-status" class="text-xs text-center text-gray-400 min-h-[14px]"></p>
+    </div>
   </div>
 
   <!-- Runs panel -->
-  <div id="spanel-runs" class="hidden flex-1 overflow-y-auto scrollbar-thin p-3">
-    <div id="runs-list" class="space-y-2"></div>
+  <div id="spanel-runs" class="hidden flex-1 overflow-y-auto scrollbar-thin flex flex-col">
+    <div class="shrink-0 px-3 py-2 border-b border-gray-100 bg-gray-50">
+      <div class="text-[10px] font-bold tracking-wider text-indigo-600">2 · TEST &amp; FIX</div>
+      <div class="text-[11px] text-gray-500 leading-tight">Past optimization runs. Click any run to inspect iterations and prompt diffs.</div>
+    </div>
+    <div id="runs-list" class="p-2 space-y-1.5 flex-1"></div>
   </div>
 
 </aside>
@@ -420,7 +1015,35 @@ pre { white-space: pre-wrap; word-break: break-word; }
 <!-- ── Main ────────────────────────────────────────────────────────────────── -->
 <main class="flex-1 min-w-0 flex flex-col" style="background:var(--surface-2)">
 
-  <!-- Empty state -->
+  <!-- Empty state (Tests) -->
+  <!-- Overleaf-style prompt viewer (Versions tab) -->
+  <div id="version-editor-pane" class="hidden flex-1 flex flex-col min-h-0">
+    <div class="ver-editor-toolbar">
+      <span class="ver-toolbar-title">Prompt viewer</span>
+      <span class="text-xs text-gray-400">Read-only</span>
+    </div>
+    <div id="ver-split-wrap" class="ver-split-wrap">
+      <div id="ver-md-col" class="ver-md-col">
+        <div class="ver-pane-label">Markdown</div>
+        <div class="ver-md-body">
+          <div id="ver-line-nums" class="ver-line-nums scrollbar-thin"></div>
+          <pre id="ver-md-pane" class="ver-md-pane scrollbar-thin"></pre>
+        </div>
+      </div>
+      <div id="ver-split-handle" class="ver-split-handle" title="Drag to resize panes">
+        <div class="ver-split-grip" aria-hidden="true"></div>
+      </div>
+      <div id="ver-preview-col" class="ver-preview-col">
+        <div class="ver-pane-label">Preview</div>
+        <div id="ver-preview-pane" class="ver-preview-pane scrollbar-thin">
+          <div class="flex flex-col items-center justify-center h-full text-gray-400 text-sm p-8 text-center">
+            Select a version in the sidebar to view its prompt.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="empty-state" class="flex-1 flex flex-col items-center justify-center" style="color:var(--text-4)">
     <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mb-5 bg-white border border-gray-200 shadow-sm">🧪</div>
     <div class="text-base font-semibold text-gray-600 mb-1.5">Select a test to view results</div>
@@ -429,6 +1052,44 @@ pre { white-space: pre-wrap; word-break: break-word; }
       then click <strong class="text-gray-500 font-medium">Generate Tests</strong>,
       then <strong class="text-gray-500 font-medium">⚡ Optimize</strong>.
     </div>
+  </div>
+
+  <!-- Empty state (Runs) -->
+  <div id="empty-state-runs" class="hidden flex-1 flex flex-col items-center justify-center" style="color:var(--text-4)">
+    <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mb-5 bg-white border border-gray-200 shadow-sm">📊</div>
+    <div class="text-base font-semibold text-gray-600 mb-1.5">Select a run to inspect</div>
+    <div class="text-sm text-gray-400 text-center max-w-xs leading-relaxed">
+      Click any run on the left to see its iterations, per-test verdicts, diagnosis, and prompt diffs.
+    </div>
+  </div>
+
+  <!-- Run detail pane -->
+  <div id="run-detail-pane" class="hidden flex-1 flex flex-col min-h-0 bg-white border-l border-gray-200 overflow-hidden">
+    <!-- Header -->
+    <div class="shrink-0 px-6 py-4 border-b border-gray-200 flex items-start justify-between bg-white">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2.5 mb-1 flex-wrap">
+          <span id="rd-id" class="font-mono text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded"></span>
+          <span id="rd-status" class="badge"></span>
+          <span id="rd-mode" class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200"></span>
+          <span id="rd-pass" class="text-xs font-semibold text-gray-700"></span>
+        </div>
+        <div id="rd-name" class="text-gray-800 font-semibold text-sm"></div>
+        <div id="rd-meta" class="text-xs text-gray-500 mt-0.5 leading-relaxed"></div>
+      </div>
+    </div>
+
+    <!-- Sub-tabs -->
+    <div class="shrink-0 flex border-b border-gray-200 px-6 bg-white">
+      <button onclick="showRunDetailTab('iterations')" id="rdtab-iterations" class="dtab active">Iterations</button>
+      <button onclick="showRunDetailTab('tests')"      id="rdtab-tests"      class="dtab">Final Tests</button>
+      <button onclick="showRunDetailTab('diff')"       id="rdtab-diff"       class="dtab">Prompt Diff</button>
+    </div>
+
+    <!-- Panels -->
+    <div id="rdpanel-iterations" class="flex-1 overflow-y-auto scrollbar-thin p-5 space-y-3"></div>
+    <div id="rdpanel-tests"      class="hidden flex-1 overflow-y-auto scrollbar-thin p-5 space-y-2"></div>
+    <div id="rdpanel-diff"       class="hidden flex-1 overflow-y-auto scrollbar-thin p-5 font-mono text-xs"></div>
   </div>
 
   <!-- Test detail pane -->
@@ -460,6 +1121,11 @@ pre { white-space: pre-wrap; word-break: break-word; }
 
   </div>
 </main>
+</div>
+
+<!-- ── Live Test full-page pane (replaces the sidebar+main layout when active) ── -->
+<div id="livetest-overlay" class="hidden flex-1 min-h-0">
+  <iframe id="livetest-iframe" src="about:blank" style="width:100%;height:100%;border:0;display:block"></iframe>
 </div>
 
 <!-- ══ Progress bar ═════════════════════════════════════════════════════════ -->
@@ -545,8 +1211,9 @@ pre { white-space: pre-wrap; word-break: break-word; }
         <label class="text-xs text-gray-500">Right (newer)</label>
         <select id="cmp-b" onchange="renderCompare()" style="font-size:12px;padding:5px 10px;border:1px solid #e5e7eb;border-radius:6px;"></select>
         <div class="ml-2 flex border border-gray-200 rounded-md overflow-hidden text-xs">
-          <button id="cmp-mode-diff" onclick="setCompareMode('diff')" class="px-3 py-1 font-medium" style="background:#eef2ff;color:#3730a3">Diff</button>
-          <button id="cmp-mode-side" onclick="setCompareMode('side')" class="px-3 py-1 font-medium" style="background:white;color:#6b7280">Side-by-side</button>
+          <button id="cmp-mode-diff" onclick="setCompareMode('diff')" class="cmp-mode-btn active px-3 py-1 font-medium">Diff</button>
+          <button id="cmp-mode-changes" onclick="setCompareMode('changes')" class="cmp-mode-btn px-3 py-1 font-medium">Changes</button>
+          <button id="cmp-mode-preview" onclick="setCompareMode('preview')" class="cmp-mode-btn px-3 py-1 font-medium">MD · Preview</button>
         </div>
         <button onclick="closeCompareModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 text-lg transition ml-1">✕</button>
       </div>
@@ -657,7 +1324,7 @@ pre { white-space: pre-wrap; word-break: break-word; }
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">Model</label>
             <input id="cfg-model" type="text" placeholder="gpt-4.1"/>
-            <div class="text-xs text-gray-400 mt-1">Recommended: gpt-4.1 · Also works: gpt-4o, o3</div>
+            <div class="text-xs text-gray-400 mt-1">Default API model. Override per run in Run options → Target model.</div>
           </div>
         </div>
       </div>
@@ -692,6 +1359,8 @@ pre { white-space: pre-wrap; word-break: break-word; }
 </div>
 
 <!-- ══ JavaScript ════════════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/diff@5.2.0/dist/diff.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
 // ── State ────────────────────────────────────────────────────────────────────
 let useCases   = [];
@@ -707,8 +1376,74 @@ let currentRunId = null;
 let eventSource  = null;
 let optimizeMode = 'auto';
 let stepRunId    = null;
+let availableModels = [];
+let optModelId = localStorage.getItem('opt-model') || '';
+
+const ALLOWED_MODEL_IDS = ['gpt-4.1', 'gpt-5.1', 'claude-sonnet-4.6'];
+const DEFAULT_MODEL_OPTIONS = [
+  { id: 'gpt-4.1', label: 'GPT-4.1', provider: 'openai', api_available: true },
+  { id: 'gpt-5.1', label: 'GPT-5.1', provider: 'openai', api_available: true },
+  { id: 'claude-sonnet-4.6', label: 'Claude Sonnet 4.6', provider: 'anthropic', api_available: false },
+];
+
+function filterAllowedModels(list) {
+  const allowed = new Set(ALLOWED_MODEL_IDS);
+  const filtered = (list || []).filter(m => allowed.has(m.id));
+  return filtered.length ? filtered : DEFAULT_MODEL_OPTIONS;
+}
+
+async function loadAvailableModels() {
+  try {
+    const res = await api('/api/models');
+    availableModels = filterAllowedModels(Array.isArray(res) ? res : []);
+  } catch (_) {
+    availableModels = DEFAULT_MODEL_OPTIONS;
+  }
+  if (!optModelId) optModelId = _labModel || 'gpt-4.1';
+  if (!availableModels.some(m => m.id === optModelId)) {
+    optModelId = 'gpt-4.1';
+    localStorage.setItem('opt-model', optModelId);
+  }
+  renderOptModelSelect();
+}
+
+function renderOptModelSelect() {
+  const sel = document.getElementById('opt-model-select');
+  if (!sel || !availableModels.length) return;
+  const current = getOptModel();
+  sel.innerHTML = availableModels.map(m => {
+    const note = m.api_available ? '' : ' · guidelines only';
+    return `<option value="${m.id}" ${m.id === current ? 'selected' : ''}>${m.label}${note}</option>`;
+  }).join('');
+  updateOptModelHint();
+}
+
+function getOptModel() {
+  const sel = document.getElementById('opt-model-select');
+  return (sel?.value || optModelId || _labModel || 'gpt-4.1').trim();
+}
+
+function saveOptModel() {
+  optModelId = getOptModel();
+  localStorage.setItem('opt-model', optModelId);
+  updateOptModelHint();
+}
+
+function updateOptModelHint() {
+  const hint = document.getElementById('opt-model-hint');
+  const m = availableModels.find(x => x.id === getOptModel());
+  if (!hint) return;
+  if (!m) {
+    hint.textContent = 'Prompts are optimized with model-specific guidelines.';
+    return;
+  }
+  hint.textContent = m.api_available
+    ? 'Tests and optimization run on this model. Prompts follow its writing guidelines.'
+    : 'Prompt writing guidelines for this model. Simulation uses your Settings API model.';
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+const _OB = '{', _CB = '}'; // brace chars for double-brace var syntax (built at runtime)
 const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g,'<br>');
 const api = (path, opts) => fetch(path, {headers:{'Content-Type':'application/json'}, ...opts}).then(r => r.json());
 const status = (id, msg, cls='text-gray-400') => { const el=document.getElementById(id); if(el){el.textContent=msg; el.className=`text-xs text-center min-h-[16px] ${cls}`; }};
@@ -716,6 +1451,9 @@ const flash  = (id, msg, cls='text-green-600') => { status(id, msg, cls); setTim
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
+  const cfg = await api('/api/config');
+  _labModel = cfg.openai_model || 'gpt-4.1';
+  await loadAvailableModels();
   useCases = await api('/api/use-cases');
   renderUcSelect();
   if (useCases.length > 0) await switchUseCase(useCases[0].id);
@@ -794,6 +1532,7 @@ async function switchUseCase(id) {
   testStatus = {};
   tests.forEach(t => { testStatus[t.test_id] = {status:'pending',overall:null,summary:'',results:[],transcript:[],tool_calls_made:{}}; });
   selectedTc = null;
+  selectedRunId = null;
 
   document.getElementById('reqs-editor').value        = currentUc.requirements || '';
   document.getElementById('curr-trigger-editor').value = currentUc.trigger || '';
@@ -808,21 +1547,113 @@ async function switchUseCase(id) {
   await renderPromptVersions();
   await renderRuns();
 
-  document.getElementById('score-total').textContent = tests.length;
-  document.getElementById('score-badge').classList.toggle('hidden', tests.length === 0);
-  document.getElementById('score-badge').style.display = tests.length > 0 ? 'flex' : 'none';
   document.getElementById('empty-state').classList.remove('hidden');
   document.getElementById('detail-pane').classList.add('hidden');
 }
 
 // ── Sidebar tabs ──────────────────────────────────────────────────────────────
-const SIDE_TABS = ['tests','reqs','variables','tools','currprompt','prompt','runs'];
+// LIST_TABS    — sidebar (panel) + main (detail) layout: Tests, Runs, Versions
+// CONFIG_TABS  — full-width centered card layout: Reqs, Vars, Tools, Curr Prompt
+// livetest     — full-page iframe (handled separately)
+const LIST_TABS   = ['tests','runs','prompt'];
+const CONFIG_TABS = ['reqs','variables','tools','rules','knowledge','currprompt'];
+const SIDE_TABS   = [...LIST_TABS, ...CONFIG_TABS];
+const TOP_TABS    = [...SIDE_TABS, 'livetest'];
+const VERSIONS_SIDEBAR_DEFAULT = '272px';
+const LIST_SIDEBAR_DEFAULT = '420px';
+
+function applyListSidebarWidth(name) {
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return;
+  if (name === 'prompt') {
+    sidebar.style.width = localStorage.getItem('sidebar-width-versions') || VERSIONS_SIDEBAR_DEFAULT;
+    sidebar.style.minWidth = '240px';
+  } else {
+    sidebar.style.width = localStorage.getItem('sidebar-width') || LIST_SIDEBAR_DEFAULT;
+    sidebar.style.minWidth = '260px';
+  }
+  sidebar.style.maxWidth = '900px';
+  sidebar.style.borderRight = '';
+  sidebar.style.background = '#fff';
+}
+
+const TAB_TO_STEP = {
+  reqs: 'setup', variables: 'setup', tools: 'setup', currprompt: 'setup',
+  tests: 'testfix', runs: 'testfix', prompt: 'testfix',
+  livetest: 'validate',
+};
+const STEP_DEFAULT_TAB = { setup: 'reqs', testfix: 'tests', validate: 'livetest' };
+let currentWorkflowStep = 'testfix';
+
+function goToStep(step) {
+  currentWorkflowStep = step;
+  showSideTab(STEP_DEFAULT_TAB[step] || 'tests');
+}
+
+function updateWorkflowNav(name) {
+  if (TAB_TO_STEP[name]) currentWorkflowStep = TAB_TO_STEP[name];
+
+  document.querySelectorAll('.stepper-step').forEach(el => {
+    el.classList.toggle('is-active', el.dataset.step === currentWorkflowStep);
+  });
+
+  const isMemory = name === 'rules' || name === 'knowledge';
+  ['setup', 'testfix', 'validate'].forEach(s => {
+    const el = document.getElementById(`subnav-${s}`);
+    if (el) el.classList.toggle('hidden', isMemory || currentWorkflowStep !== s);
+  });
+
+  const hint = document.getElementById('subnav-hint');
+  if (hint) hint.classList.toggle('hidden', name !== 'livetest');
+}
+
 function showSideTab(name) {
   currentSideTab = name;
+  closeVerDropdown();
   SIDE_TABS.forEach(t => {
     document.getElementById(`spanel-${t}`).classList.toggle('hidden', t !== name);
-    document.getElementById(`stab-${t}`).classList.toggle('active', t === name);
   });
+  TOP_TABS.forEach(t => {
+    const btn = document.getElementById(`stab-${t}`);
+    if (btn) btn.classList.toggle('active', t === name);
+  });
+
+  updateWorkflowNav(name);
+
+  const overlay = document.getElementById('livetest-overlay');
+  const layout  = document.getElementById('main-layout');
+  const iframe  = document.getElementById('livetest-iframe');
+  const sidebar = document.getElementById('sidebar');
+  const handle  = document.getElementById('sidebar-resize-handle');
+  const mainEl  = document.querySelector('main');
+
+  // Live Test = full-page iframe (replaces entire layout)
+  if (name === 'livetest') {
+    if (iframe && iframe.src === 'about:blank') iframe.src = '/live-bot?embedded=1';
+    if (overlay) overlay.classList.remove('hidden');
+    if (layout)  layout.style.display = 'none';
+    return;
+  }
+  if (overlay) overlay.classList.add('hidden');
+  if (layout)  layout.style.display = '';
+
+  // Config tabs = sidebar expands to full width, <main> is hidden
+  if (CONFIG_TABS.includes(name)) {
+    if (sidebar) {
+      sidebar.style.width      = '100%';
+      sidebar.style.maxWidth   = 'none';
+      sidebar.style.minWidth   = '0';
+      sidebar.style.borderRight = 'none';
+      sidebar.style.background = 'var(--surface-2)';
+    }
+    if (handle) handle.style.display = 'none';
+    if (mainEl) mainEl.style.display = 'none';
+  } else {
+    // List tabs — sidebar width depends on tab (Versions is narrower)
+    if (sidebar) applyListSidebarWidth(name);
+    if (handle) handle.style.display = '';
+    if (mainEl) mainEl.style.display = '';
+  }
   // Sync curr-prompt-editor when switching to it
   if (name === 'currprompt' && currentUc) {
     const editor = document.getElementById('curr-prompt-editor');
@@ -832,7 +1663,59 @@ function showSideTab(name) {
     updateCurrPromptMeta();
   }
   // Refresh version list when switching to Versions tab
-  if (name === 'prompt' && currentUcId) renderPromptVersions();
+  if (name === 'prompt' && currentUcId) {
+    renderPromptVersions();
+    syncVersionPreview();
+  }
+  // Load acceptance rules when switching to Rules tab (across ALL agents)
+  if (name === 'rules') loadAcceptanceRulesList();
+  if (name === 'knowledge') loadKnowledge();
+
+  // ── Main-pane swap: pick the right empty/detail view per tab ────────────
+  const emptyTests = document.getElementById('empty-state');
+  const emptyRuns  = document.getElementById('empty-state-runs');
+  const detailPane = document.getElementById('detail-pane');
+  const runDetail  = document.getElementById('run-detail-pane');
+  const versionPane = document.getElementById('version-editor-pane');
+  if (versionPane) versionPane.classList.toggle('hidden', name !== 'prompt');
+
+  if (emptyTests && emptyRuns && detailPane && runDetail) {
+    if (name === 'prompt') {
+      emptyTests.classList.add('hidden');
+      emptyRuns.classList.add('hidden');
+      detailPane.classList.add('hidden');
+      runDetail.classList.add('hidden');
+    }
+    if (name === 'runs') {
+      // Runs tab: show run detail if one selected, else the runs empty state
+      detailPane.classList.add('hidden');
+      emptyTests.classList.add('hidden');
+      if (selectedRunId) {
+        runDetail.classList.remove('hidden');
+        emptyRuns.classList.add('hidden');
+        renderRunDetail();
+      } else {
+        runDetail.classList.add('hidden');
+        emptyRuns.classList.remove('hidden');
+      }
+      renderRuns();
+    } else if (name === 'tests') {
+      // Tests tab: keep behavior — empty state or detail-pane based on selection
+      runDetail.classList.add('hidden');
+      emptyRuns.classList.add('hidden');
+      if (selectedTc) {
+        emptyTests.classList.add('hidden');
+        detailPane.classList.remove('hidden');
+      } else {
+        emptyTests.classList.remove('hidden');
+        detailPane.classList.add('hidden');
+      }
+    } else {
+      // Other list tabs (prompt/versions) — hide both detail panes
+      runDetail.classList.add('hidden');
+      emptyRuns.classList.add('hidden');
+    }
+  }
 }
 
 // ── Detail tabs ───────────────────────────────────────────────────────────────
@@ -865,7 +1748,6 @@ function renderTestList() {
       <span class="truncate text-gray-700" style="font-size:12px">${esc(tc.name.split(':').slice(1).join(':').trim() || tc.name)}</span>`;
     container.appendChild(item);
   });
-  document.getElementById('score-pass').textContent = pass;
   const anyFailed = tests.some(t => testStatus[t.test_id]?.overall === 'FAIL');
   document.getElementById('btn-rerun-failed').classList.toggle('hidden', !anyFailed || isRunning);
 }
@@ -921,7 +1803,7 @@ function renderTranscript() {
     area.innerHTML = `<div class="flex flex-col items-center justify-center py-16 text-gray-400">
       <div class="text-2xl mb-3">▷</div>
       <div class="text-sm font-medium text-gray-500">Run the test to see the transcript</div>
-      <div class="text-xs text-gray-400 mt-1">Click ▶ Run Tests or ⚡ Optimize</div>
+      <div class="text-xs text-gray-400 mt-1">Click <strong>Run Tests</strong> below or <strong>Optimize</strong> in the header</div>
     </div>`;
     return;
   }
@@ -932,6 +1814,42 @@ function renderTranscript() {
     </div>`;
   }
   (s.transcript || []).forEach(e => area.appendChild(buildEntry(e)));
+
+  if (s.status === 'done' && s.results?.length) {
+    const divider = document.createElement('div');
+    divider.className = 'mt-4 pt-4 border-t border-gray-200';
+
+    const sections = [
+      { label: 'PASS CRITERIA', items: s.results, keyVerdict: 'verdict', keyText: 'criterion', keyReason: 'reason' },
+    ];
+    if (s.behavior_results?.length) {
+      sections.push({ label: 'AGENT BEHAVIOR EXPECTATIONS', items: s.behavior_results, keyVerdict: 'verdict', keyText: 'expectation', keyReason: 'reason' });
+    }
+
+    sections.forEach(({ label, items, keyVerdict, keyText, keyReason }) => {
+      const hdr = document.createElement('div');
+      hdr.className = 'text-[10px] font-semibold tracking-widest text-gray-400 mb-2 mt-3';
+      hdr.textContent = label;
+      divider.appendChild(hdr);
+      items.forEach((r, idx) => {
+        const isPass = r[keyVerdict] === 'PASS';
+        const el = document.createElement('div');
+        el.className = 'fade-in flex items-start gap-3 p-3.5 rounded-xl border mb-2';
+        el.style.cssText = isPass
+          ? 'background:var(--success-bg);border-color:var(--success-bd)'
+          : 'background:var(--error-bg);border-color:var(--error-bd)';
+        el.innerHTML = `
+          <span class="shrink-0 text-sm font-bold mt-0.5" style="color:${isPass?'var(--success)':'var(--error)'}">${isPass?'✓':'✗'}</span>
+          <div class="min-w-0 flex-1">
+            <div class="text-sm font-medium" style="color:${isPass?'var(--success)':'var(--error)'}">${esc(r[keyText])}</div>
+            ${r[keyReason] ? `<div class="text-xs mt-1 leading-relaxed" style="color:var(--text-3)">${esc(r[keyReason])}</div>` : ''}
+            ${!isPass ? `<button onclick="openAcceptanceModal(${idx})" class="mt-2 text-[11px] px-2 py-0.5 rounded border border-red-300 text-red-700 bg-white hover:bg-red-100">⚑ LLM was wrong — accept this</button>` : ''}
+          </div>`;
+        divider.appendChild(el);
+      });
+    });
+    area.appendChild(divider);
+  }
 }
 
 function buildEntry(e) {
@@ -973,7 +1891,7 @@ function renderCriteria() {
     <div class="badge ${allPass?'badge-pass':'badge-fail'}">${pass}/${total} passing</div>
     <span class="text-sm text-gray-500">${allPass ? 'All criteria satisfied' : `${total-pass} criterion failing`}</span>`;
   area.appendChild(sum);
-  s.results.forEach(r => {
+  s.results.forEach((r, idx) => {
     const el = document.createElement('div');
     const isPass = r.verdict === 'PASS';
     el.className = 'fade-in flex items-start gap-3 p-3.5 rounded-xl border mb-2';
@@ -982,9 +1900,10 @@ function renderCriteria() {
       : `background:var(--error-bg);border-color:var(--error-bd)`;
     el.innerHTML = `
       <span class="shrink-0 text-sm font-bold mt-0.5" style="color:${isPass?'var(--success)':'var(--error)'}">${isPass?'✓':'✗'}</span>
-      <div class="min-w-0">
+      <div class="min-w-0 flex-1">
         <div class="text-sm font-medium" style="color:${isPass?'var(--success)':'var(--error)'}">${esc(r.criterion)}</div>
         ${r.reason ? `<div class="text-xs mt-1 leading-relaxed" style="color:var(--text-3)">${esc(r.reason)}</div>` : ''}
+        ${!isPass ? `<button onclick="openAcceptanceModal(${idx})" class="mt-2 text-[11px] px-2 py-0.5 rounded border border-red-300 text-red-700 bg-white hover:bg-red-100">⚑ LLM was wrong — accept this</button>` : ''}
       </div>`;
     area.appendChild(el);
   });
@@ -1034,6 +1953,21 @@ function setMode(m) {
 }
 
 async function runAll()       { await startRun(null, 'run'); }
+
+// ── Run Tests split-button menu ───────────────────────────────────────────────
+function toggleRunMenu(ev) {
+  if (ev) ev.stopPropagation();
+  document.getElementById('run-menu')?.classList.toggle('hidden');
+}
+function closeRunMenu() {
+  document.getElementById('run-menu')?.classList.add('hidden');
+}
+document.addEventListener('click', (e) => {
+  const split = document.getElementById('run-split');
+  if (split && !split.contains(e.target)) {
+    document.getElementById('run-menu').classList.add('hidden');
+  }
+});
 async function rerunFailed()  { const ids=tests.filter(t=>testStatus[t.test_id]?.overall==='FAIL').map(t=>t.test_id); if(ids.length) await startRun(ids,'run'); }
 async function runSingle()    { if (selectedTc) await startRun([selectedTc],'run'); }
 async function startOptimize(){
@@ -1063,11 +1997,12 @@ async function startRun(ids, endpoint='run') {
   if (selectedTc && toRun.includes(selectedTc)) renderDetail();
 
   let res;
+  const runModel = getOptModel();
   if (endpoint === 'optimize') {
     const maxIter = parseInt(document.getElementById('max-iter-input').value) || 10;
-    res = await api(`/api/use-cases/${currentUcId}/optimize`, {method:'POST', body: JSON.stringify({mode: optimizeMode, max_iterations: maxIter})});
+    res = await api(`/api/use-cases/${currentUcId}/optimize`, {method:'POST', body: JSON.stringify({mode: optimizeMode, max_iterations: maxIter, model: runModel})});
   } else {
-    res = await api(`/api/use-cases/${currentUcId}/run`, {method:'POST', body: JSON.stringify({ids})});
+    res = await api(`/api/use-cases/${currentUcId}/run`, {method:'POST', body: JSON.stringify({ids, model: runModel})});
   }
 
   if (res?.error) {
@@ -1242,10 +2177,6 @@ async function generateTests() {
     tests = await api(`/api/use-cases/${currentUcId}/tests`);
     testStatus = {};
     tests.forEach(t => { testStatus[t.test_id]={status:'pending',overall:null,summary:'',results:[],transcript:[],tool_calls_made:{}}; });
-    document.getElementById('score-total').textContent = tests.length;
-    const sb = document.getElementById('score-badge');
-    sb.classList.toggle('hidden', tests.length===0);
-    sb.style.display = tests.length > 0 ? 'flex' : 'none';
     selectedTc = null;
     document.getElementById('empty-state').classList.remove('hidden');
     document.getElementById('detail-pane').classList.add('hidden');
@@ -1271,40 +2202,40 @@ function renderVariables() {
 
 function saRow(sa, i) {
   const el = document.createElement('div');
-  el.className = 'bg-gray-50 border border-gray-200 rounded-lg p-2.5 space-y-1.5';
+  el.className = 'bg-white border border-gray-200 rounded-lg p-3 space-y-2';
   el.id = `sa-${i}`;
   el.innerHTML = `
-    <div class="flex gap-1.5">
-      <input type="text" placeholder="Agent name" value="${esc(sa.name||'')}" style="flex:1;font-size:12px;padding:5px 8px"/>
+    <div class="flex gap-2 items-center">
+      <input type="text" placeholder="Agent name" value="${esc(sa.name||'')}" style="flex:1;font-size:13px;padding:6px 10px"/>
       <button onclick="document.getElementById('sa-${i}').remove()" class="w-7 h-7 flex items-center justify-center rounded hover:bg-red-50 text-gray-400 hover:text-red-500 text-lg leading-none transition shrink-0">×</button>
     </div>
-    <input type="text" placeholder="Description" value="${esc(sa.description||'')}" style="font-size:12px;padding:5px 8px;color:var(--text-3)"/>`;
+    <input type="text" placeholder="Description" value="${esc(sa.description||'')}" style="font-size:13px;padding:6px 10px;color:var(--text-3)"/>`;
   return el;
 }
 
 function mkRow(mk, i) {
   const el = document.createElement('div');
-  el.className = 'bg-gray-50 border border-gray-200 rounded-lg p-2.5 space-y-1.5';
+  el.className = 'bg-white border border-gray-200 rounded-lg p-3 space-y-2';
   el.id = `mk-${i}`;
   el.innerHTML = `
-    <div class="flex gap-1.5">
-      <input type="text" placeholder="{{variableName}}" value="${esc(mk.key_name||'')}" style="flex:1;font-size:12px;padding:5px 8px;font-family:monospace"/>
+    <div class="flex gap-2 items-center">
+      <input type="text" placeholder="${_OB}${_OB}variableName${_CB}${_CB}" value="${esc(mk.key_name||'')}" style="flex:1;font-size:13px;padding:6px 10px;font-family:monospace"/>
       <button onclick="document.getElementById('mk-${i}').remove()" class="w-7 h-7 flex items-center justify-center rounded hover:bg-red-50 text-gray-400 hover:text-red-500 text-lg leading-none transition shrink-0">×</button>
     </div>
-    <input type="text" placeholder="Description" value="${esc(mk.description||'')}" style="font-size:12px;padding:5px 8px;color:var(--text-3)"/>`;
+    <input type="text" placeholder="Description" value="${esc(mk.description||'')}" style="font-size:13px;padding:6px 10px;color:var(--text-3)"/>`;
   return el;
 }
 
 function rmRow(rm, i) {
   const el = document.createElement('div');
-  el.className = 'bg-gray-50 border border-gray-200 rounded-lg p-2.5 space-y-1.5';
+  el.className = 'bg-white border border-gray-200 rounded-lg p-3 space-y-2';
   el.id = `rm-${i}`;
   el.innerHTML = `
-    <div class="flex gap-1.5">
-      <input type="text" placeholder="Rich media name" value="${esc(rm.name||'')}" style="flex:1;font-size:12px;padding:5px 8px"/>
+    <div class="flex gap-2 items-center">
+      <input type="text" placeholder="Rich media name" value="${esc(rm.name||'')}" style="flex:1;font-size:13px;padding:6px 10px"/>
       <button onclick="document.getElementById('rm-${i}').remove()" class="w-7 h-7 flex items-center justify-center rounded hover:bg-red-50 text-gray-400 hover:text-red-500 text-lg leading-none transition shrink-0">×</button>
     </div>
-    <input type="text" placeholder="Slug / id" value="${esc(rm.slug||'')}" style="font-size:12px;padding:5px 8px;color:var(--text-3);font-family:monospace"/>`;
+    <input type="text" placeholder="Slug / id" value="${esc(rm.slug||'')}" style="font-size:13px;padding:6px 10px;color:var(--text-3);font-family:monospace"/>`;
   return el;
 }
 
@@ -1399,6 +2330,83 @@ async function saveTools() {
 
 // ── Prompt ────────────────────────────────────────────────────────────────────
 let _promptVersions = [];
+let _selectedPromptVersion = null;
+
+function getSelectedPromptVersion() {
+  const sel = document.getElementById('prompt-version-select');
+  if (sel?.value) return +sel.value;
+  return _selectedPromptVersion;
+}
+
+function updateVerTrigger() {
+  const vNum = getSelectedPromptVersion();
+  const v = _promptVersions.find(x => x.version === vNum);
+  const vEl = document.getElementById('ver-trigger-v');
+  const subEl = document.getElementById('ver-trigger-sub');
+  if (!vEl || !subEl) return;
+  if (!v) {
+    vEl.textContent = 'v—';
+    subEl.textContent = 'Select a version…';
+    return;
+  }
+  vEl.textContent = `${v.is_current ? '★ ' : ''}v${v.version}`;
+  subEl.textContent = fmtTimestamp(v.created_at);
+}
+
+function renderVerDropdown() {
+  const list = document.getElementById('ver-dropdown-list');
+  if (!list) return;
+  const q = (document.getElementById('ver-search')?.value || '').trim().toLowerCase();
+  const filtered = q
+    ? _promptVersions.filter(v =>
+        `v${v.version}`.includes(q) || fmtTimestamp(v.created_at).toLowerCase().includes(q))
+    : _promptVersions;
+  if (!filtered.length) {
+    list.innerHTML = '<div class="px-3 py-4 text-center text-xs text-gray-400">No matches</div>';
+    return;
+  }
+  const selV = getSelectedPromptVersion();
+  list.innerHTML = filtered.map(v => {
+    const isSel = v.version === selV;
+    const star = v.is_current ? '<span class="ver-dd-star">★ current best</span>' : '';
+    let label = '';
+    if (v.label === 'optimized') label = '<span class="ver-dd-label opt">optimized</span>';
+    else if (v.label === 'input') label = '<span class="ver-dd-label inp">input</span>';
+    return `<button type="button" class="ver-dd-item ${isSel ? 'is-selected' : ''}" onclick="pickPromptVersion(${v.version})">
+      <div class="ver-dd-row"><span class="ver-dd-v">v${v.version}</span>${star}${label}</div>
+      <span class="ver-dd-ts">${esc(fmtTimestamp(v.created_at))}</span>
+    </button>`;
+  }).join('');
+}
+
+function toggleVerDropdown(ev) {
+  ev?.stopPropagation();
+  const dd = document.getElementById('ver-dropdown');
+  if (!dd) return;
+  if (dd.classList.contains('hidden')) {
+    renderVerDropdown();
+    dd.classList.remove('hidden');
+    setTimeout(() => document.getElementById('ver-search')?.focus(), 30);
+  } else {
+    closeVerDropdown();
+  }
+}
+
+function closeVerDropdown() {
+  const dd = document.getElementById('ver-dropdown');
+  if (dd) dd.classList.add('hidden');
+  const s = document.getElementById('ver-search');
+  if (s) s.value = '';
+}
+
+async function pickPromptVersion(v) {
+  _selectedPromptVersion = v;
+  const sel = document.getElementById('prompt-version-select');
+  if (sel) sel.value = v;
+  closeVerDropdown();
+  updateVerTrigger();
+  await loadPromptVersion(v);
+}
 
 function fmtTimestamp(s) {
   if (!s) return 'draft';
@@ -1410,39 +2418,44 @@ async function renderPromptVersions() {
   const versions = await api(`/api/use-cases/${currentUcId}/prompt/versions`);
   _promptVersions = versions;
   const sel = document.getElementById('prompt-version-select');
-  sel.innerHTML = versions.map(v => {
-    const labelTag = v.label === 'optimized' ? ' [optimized]' : v.label === 'input' ? ' [input]' : '';
-    const prefix   = v.is_current ? '★ current best · ' : '';
-    return `<option value="${v.version}" ${v.is_current?'selected':''}>${prefix}v${v.version} · ${fmtTimestamp(v.created_at)}${labelTag}</option>`;
-  }).join('');
-  updatePromptMeta();
+  const current = versions.find(v => v.is_current) || versions[versions.length - 1];
+  if (current && sel) {
+    sel.value = current.version;
+    _selectedPromptVersion = current.version;
+  }
+  updateVerTrigger();
+  const selId = getSelectedPromptVersion();
+  if (selId) await loadPromptVersion(selId);
+  else updatePromptMeta();
 }
 
 function updatePromptMeta() {
-  const sel = document.getElementById('prompt-version-select');
   const meta = document.getElementById('prompt-version-meta');
-  if (!sel || !meta) return;
-  const selV = +sel.value;
+  if (!meta) return;
+  const selV = getSelectedPromptVersion();
   const v = _promptVersions.find(x => x.version === selV);
   const text = document.getElementById('prompt-editor').value || '';
   const lines = text ? text.split('\n').length : 0;
   const chars = text.length;
-  const isCurrent = v?.is_current;
-  const statusTag = isCurrent
-    ? `<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:9999px;font-weight:600;font-size:11px;">★ current best</span>`
-    : `<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:9999px;font-weight:600;font-size:11px;">prior version</span>`;
-  const labelMap = { optimized: ['#eff6ff','#1d4ed8','⚡ optimized'], input: ['#f0fdf4','#15803d','📥 input'] };
+  const tokens = estimateTokens(text);
+  const model = getOptModel() || _labModel || 'gpt-4.1';
+  const statusTag = v?.is_current
+    ? '<span class="ver-dd-star">★ current best</span>'
+    : '<span class="ver-dd-label" style="background:#fef3c7;color:#92400e">prior version</span>';
+  const labelMap = { optimized: ['opt', 'optimized'], input: ['inp', 'input'] };
   const lm = labelMap[v?.label] || null;
-  const labelTag = lm
-    ? `<span style="background:${lm[0]};color:${lm[1]};padding:2px 8px;border-radius:9999px;font-weight:600;font-size:11px;">${lm[2]}</span>`
-    : '';
-  meta.innerHTML = v
-    ? `${statusTag}${labelTag}
-       <span style="font-weight:600;color:#111827">v${v.version}</span>
-       <span style="color:#6b7280">${fmtTimestamp(v.created_at)}</span>
-       <span style="color:#6b7280;margin-left:auto">${lines.toLocaleString()} lines · ${chars.toLocaleString()} chars</span>`
-    : `<span style="color:#6b7280">No version loaded</span>
-       <span style="color:#6b7280;margin-left:auto">${lines.toLocaleString()} lines · ${chars.toLocaleString()} chars</span>`;
+  const labelTag = lm ? `<span class="ver-dd-label ${lm[0]}">${lm[1]}</span>` : '';
+  if (v) {
+    meta.innerHTML = `
+      <div class="ver-meta-row">${statusTag}${labelTag}</div>
+      <div class="ver-meta-stat"><strong>v${v.version}</strong> · ${esc(fmtTimestamp(v.created_at))}</div>
+      <div class="ver-meta-stat">${lines.toLocaleString()} lines · ${chars.toLocaleString()} chars · <strong>${tokens.toLocaleString()}</strong> tokens · ${esc(model)}</div>`;
+  } else {
+    meta.innerHTML = `
+      <div class="ver-meta-stat" style="color:var(--text-4)">No version loaded</div>
+      <div class="ver-meta-stat">${lines.toLocaleString()} lines · ${chars.toLocaleString()} chars · <strong>${tokens.toLocaleString()}</strong> tokens · ${esc(model)}</div>`;
+  }
+  syncVersionPreview();
 }
 
 async function loadPromptVersion(v) {
@@ -1450,6 +2463,7 @@ async function loadPromptVersion(v) {
   const p = await api(`/api/use-cases/${currentUcId}/prompt/versions/${v}`);
   if (p?.content !== undefined) document.getElementById('prompt-editor').value = p.content;
   updatePromptMeta();
+  syncVersionPreview();
 }
 
 // ── Curr Prompt tab functions ─────────────────────────────────────────────────
@@ -1493,14 +2507,14 @@ async function saveCurrPromptVersion() {
 
 // Load a selected history version into Curr Prompt for editing
 async function loadVersionToCurrPrompt() {
-  const sel = document.getElementById('prompt-version-select');
-  if (!sel.value || !currentUcId) return;
-  const p = await api(`/api/use-cases/${currentUcId}/prompt/versions/${sel.value}`);
+  const v = getSelectedPromptVersion();
+  if (!v || !currentUcId) return;
+  const p = await api(`/api/use-cases/${currentUcId}/prompt/versions/${v}`);
   if (p?.content !== undefined) {
     document.getElementById('curr-prompt-editor').value = p.content;
     updateCurrPromptMeta();
     showSideTab('currprompt');
-    flash('curr-prompt-status', `✓ Loaded v${sel.value} — click Save to use for Optimize`);
+    flash('curr-prompt-status', `✓ Loaded v${v} — click Save to use for Optimize`);
   }
 }
 
@@ -1530,8 +2544,269 @@ async function reloadPrompt() {
   await renderPromptVersions();
 }
 
+let _labModel = 'gpt-4.1';
+
+function estimateTokens(text) {
+  if (!text) return 0;
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
+function splitLinesKeep(text) {
+  if (!text) return [];
+  const lines = text.split('\n');
+  if (lines.length && lines[lines.length - 1] === '') lines.pop();
+  return lines;
+}
+
+function countLineChanges(oldText, newText) {
+  if (typeof Diff === 'undefined') {
+    const adds = (newText || '').split('\n').length;
+    const rems = (oldText || '').split('\n').length;
+    return { adds: 0, rems: 0 };
+  }
+  let adds = 0, rems = 0;
+  Diff.diffLines(oldText || '', newText || '').forEach(p => {
+    const n = splitLinesKeep(p.value).length;
+    if (p.added) adds += n;
+    if (p.removed) rems += n;
+  });
+  return { adds, rems };
+}
+
+function wordDiffHtml(oldStr, newStr, side) {
+  if (oldStr === newStr) return escapeHtml(oldStr);
+  if (typeof Diff === 'undefined') return escapeHtml(side === 'old' ? oldStr : newStr);
+  return Diff.diffWords(oldStr || '', newStr || '').map(p => {
+    const v = escapeHtml(p.value);
+    if (p.added && side === 'new') return `<span class="diff-w-add">${v}</span>`;
+    if (p.removed && side === 'old') return `<span class="diff-w-rm">${v}</span>`;
+    if (p.added || p.removed) return '';
+    return v;
+  }).join('');
+}
+
+function cmpRow(ln, html, rowCls) {
+  return `<div class="cmp-row diff-line-${rowCls}"><span class="cmp-ln">${ln || ''}</span><span class="cmp-txt">${html || '&nbsp;'}</span></div>`;
+}
+
+function renderAlignedChanges(oldText, newText) {
+  if (typeof Diff === 'undefined') return '<div class="p-6 text-sm text-gray-500">Diff library not loaded.</div>';
+  const parts = Diff.diffLines(oldText || '', newText || '');
+  let left = '', right = '', leftLn = 1, rightLn = 1;
+  let i = 0;
+  while (i < parts.length) {
+    const part = parts[i];
+    if (!part.added && !part.removed) {
+      splitLinesKeep(part.value).forEach(line => {
+        left += cmpRow(leftLn++, escapeHtml(line), 'ctx');
+        right += cmpRow(rightLn++, escapeHtml(line), 'ctx');
+      });
+      i++;
+    } else if (part.removed && parts[i + 1]?.added) {
+      const oldLines = splitLinesKeep(part.value);
+      const newLines = splitLinesKeep(parts[i + 1].value);
+      const max = Math.max(oldLines.length, newLines.length);
+      for (let j = 0; j < max; j++) {
+        const o = oldLines[j] ?? '';
+        const n = newLines[j] ?? '';
+        if (o === n) {
+          left += cmpRow(leftLn++, escapeHtml(o), 'ctx');
+          right += cmpRow(rightLn++, escapeHtml(n), 'ctx');
+        } else {
+          left += cmpRow(o ? leftLn++ : '', o ? wordDiffHtml(o, n, 'old') : '', o ? 'chg' : 'empty');
+          right += cmpRow(n ? rightLn++ : '', n ? wordDiffHtml(o, n, 'new') : '', n ? 'chg' : 'empty');
+        }
+      }
+      i += 2;
+    } else if (part.removed) {
+      splitLinesKeep(part.value).forEach(line => {
+        left += cmpRow(leftLn++, `<span class="diff-w-rm">${escapeHtml(line)}</span>`, 'rm');
+        right += cmpRow('', '', 'empty');
+      });
+      i++;
+    } else {
+      splitLinesKeep(part.value).forEach(line => {
+        left += cmpRow('', '', 'empty');
+        right += cmpRow(rightLn++, `<span class="diff-w-add">${escapeHtml(line)}</span>`, 'add');
+      });
+      i++;
+    }
+  }
+  return `<div class="cmp-grid">
+    <div><div class="cmp-col-hdr">v${document.getElementById('cmp-a').value} (older)</div><div>${left}</div></div>
+    <div><div class="cmp-col-hdr">v${document.getElementById('cmp-b').value} (newer)</div><div>${right}</div></div>
+  </div>`;
+}
+
+function renderUnifiedDiffWithWords(oldText, newText) {
+  if (typeof Diff === 'undefined') return '<div class="p-6 text-sm text-gray-500">Diff library not loaded.</div>';
+  const parts = Diff.diffLines(oldText || '', newText || '');
+  let html = '';
+  let i = 0;
+  while (i < parts.length) {
+    const part = parts[i];
+    if (!part.added && !part.removed) {
+      splitLinesKeep(part.value).forEach(line => {
+        html += `<div class="cmp-row diff-line-ctx"><span class="cmp-ln"></span><span class="cmp-txt" style="color:#6b7280">${escapeHtml(line)}</span></div>`;
+      });
+      i++;
+    } else if (part.removed && parts[i + 1]?.added) {
+      const oldLines = splitLinesKeep(part.value);
+      const newLines = splitLinesKeep(parts[i + 1].value);
+      const max = Math.max(oldLines.length, newLines.length);
+      for (let j = 0; j < max; j++) {
+        const o = oldLines[j] ?? '';
+        const n = newLines[j] ?? '';
+        if (o && o !== n) {
+          html += `<div class="cmp-row diff-line-rm"><span class="cmp-ln">−</span><span class="cmp-txt">${wordDiffHtml(o, n, 'old')}</span></div>`;
+        } else if (o) {
+          html += `<div class="cmp-row diff-line-rm"><span class="cmp-ln">−</span><span class="cmp-txt">${escapeHtml(o)}</span></div>`;
+        }
+        if (n && o !== n) {
+          html += `<div class="cmp-row diff-line-add"><span class="cmp-ln">+</span><span class="cmp-txt">${wordDiffHtml(o, n, 'new')}</span></div>`;
+        } else if (n && !o) {
+          html += `<div class="cmp-row diff-line-add"><span class="cmp-ln">+</span><span class="cmp-txt">${escapeHtml(n)}</span></div>`;
+        }
+      }
+      i += 2;
+    } else if (part.removed) {
+      splitLinesKeep(part.value).forEach(line => {
+        html += `<div class="cmp-row diff-line-rm"><span class="cmp-ln">−</span><span class="cmp-txt"><span class="diff-w-rm">${escapeHtml(line)}</span></span></div>`;
+      });
+      i++;
+    } else {
+      splitLinesKeep(part.value).forEach(line => {
+        html += `<div class="cmp-row diff-line-add"><span class="cmp-ln">+</span><span class="cmp-txt"><span class="diff-w-add">${escapeHtml(line)}</span></span></div>`;
+      });
+      i++;
+    }
+  }
+  return html || '<div class="p-6 text-sm text-gray-500 text-center">No differences.</div>';
+}
+
+function renderSourceWithDiff(oldText, newText) {
+  if (typeof Diff === 'undefined') return escapeHtml(newText || '');
+  const parts = Diff.diffLines(oldText || '', newText || '');
+  let html = '', i = 0, ln = 1;
+  while (i < parts.length) {
+    const part = parts[i];
+    if (!part.added && !part.removed) {
+      splitLinesKeep(part.value).forEach(line => {
+        html += `<div class="cmp-row"><span class="cmp-ln">${ln++}</span><span class="cmp-txt">${escapeHtml(line)}</span></div>`;
+      });
+      i++;
+    } else if (part.removed && parts[i + 1]?.added) {
+      const oldLines = splitLinesKeep(part.value);
+      const newLines = splitLinesKeep(parts[i + 1].value);
+      const max = Math.max(oldLines.length, newLines.length);
+      for (let j = 0; j < max; j++) {
+        const o = oldLines[j] ?? '';
+        const n = newLines[j] ?? '';
+        if (n) {
+          const inner = (o && o !== n) ? wordDiffHtml(o, n, 'new') : escapeHtml(n);
+          html += `<div class="cmp-row diff-line-chg"><span class="cmp-ln">${ln++}</span><span class="cmp-txt">${inner}</span></div>`;
+        }
+      }
+      i += 2;
+    } else if (part.added) {
+      splitLinesKeep(part.value).forEach(line => {
+        html += `<div class="cmp-row diff-line-add"><span class="cmp-ln">${ln++}</span><span class="cmp-txt"><span class="diff-w-add">${escapeHtml(line)}</span></span></div>`;
+      });
+      i++;
+    } else {
+      i++;
+    }
+  }
+  return html;
+}
+
+function renderPromptPreview(md) {
+  if (!md) return '<p style="color:#9ca3af">No content</p>';
+  const ph = [];
+  const mark = html => { const id = `\x00PH${ph.length}\x00`; ph.push(html); return id; };
+  let t = md;
+  t = t.replace(/@\[(workflow):([^\]]+)\]/gi, (_, _k, slug) => {
+    const label = slug.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+    return mark(`<span class="yai-chip yai-chip-workflow"><span class="yai-chip-icon">⚡</span>@${escapeHtml(label)}</span>`);
+  });
+  t = t.replace(/@\[(richMedia|richmedia):([^\]]+)\]/gi, (_, _k, slug) => {
+    const label = slug.split('--')[0].trim().replace(/_/g, ' ');
+    return mark(`<span class="yai-chip yai-chip-media"><span class="yai-chip-icon">▦</span>@${escapeHtml(label)}</span>`);
+  });
+  const varRe = new RegExp(_OB + _OB + '([^' + _CB + ']+)' + _CB + _CB, 'g');
+  t = t.replace(varRe, (_, v) => mark('<code class="yai-var">' + _OB + _OB + escapeHtml(v.trim()) + _CB + _CB + '</code>'));
+  t = t.replace(/@([a-zA-Z][a-zA-Z0-9_-]*)/g, (_, name) => {
+    if (name === 'workflow' || name === 'richMedia') return '@' + name;
+    return mark(`<span class="yai-chip yai-chip-workflow"><span class="yai-chip-icon">⚡</span>@${escapeHtml(name)}</span>`);
+  });
+  let html = (typeof marked !== 'undefined')
+    ? marked.parse(t, { breaks: true, gfm: true })
+    : escapeHtml(t).replace(/\n/g, '<br>');
+  ph.forEach((h, i) => { html = html.replace(`\x00PH${i}\x00`, h); });
+  return `<div class="prompt-preview">${html}</div>`;
+}
+
+function syncVersionPreview() {
+  const text = document.getElementById('prompt-editor')?.value || '';
+  const md = document.getElementById('ver-md-pane');
+  const nums = document.getElementById('ver-line-nums');
+  const prev = document.getElementById('ver-preview-pane');
+  if (md) md.textContent = text || '';
+  if (nums) {
+    const n = text ? text.split('\n').length : 0;
+    nums.textContent = n ? Array.from({ length: n }, (_, i) => i + 1).join('\n') : '';
+  }
+  if (prev) {
+    prev.innerHTML = text
+      ? renderPromptPreview(text)
+      : `<div class="flex flex-col items-center justify-center h-full text-gray-400 text-sm p-8 text-center">Select a version in the sidebar to view its prompt.</div>`;
+  }
+}
+
+(function initVerEditorChrome() {
+  const md = document.getElementById('ver-md-pane');
+  const nums = document.getElementById('ver-line-nums');
+  if (md && nums) md.addEventListener('scroll', () => { nums.scrollTop = md.scrollTop; });
+
+  const handle = document.getElementById('ver-split-handle');
+  const mdCol = document.getElementById('ver-md-col');
+  const wrap = document.getElementById('ver-split-wrap');
+  if (!handle || !mdCol || !wrap) return;
+
+  const saved = localStorage.getItem('ver-md-width-pct');
+  if (saved) mdCol.style.flex = `0 0 ${saved}%`;
+
+  let startX, startW, wrapW;
+  handle.addEventListener('mousedown', e => {
+    window._verSplitResizing = true;
+    startX = e.clientX;
+    startW = mdCol.offsetWidth;
+    wrapW = wrap.offsetWidth;
+    handle.classList.add('is-dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!window._verSplitResizing) return;
+    const newW = Math.max(180, Math.min(wrapW - 180, startW + (e.clientX - startX)));
+    mdCol.style.flex = `0 0 ${(newW / wrapW) * 100}%`;
+  });
+  document.addEventListener('mouseup', () => {
+    if (!window._verSplitResizing) return;
+    window._verSplitResizing = false;
+    handle.classList.remove('is-dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    if (wrap.offsetWidth > 0) {
+      localStorage.setItem('ver-md-width-pct', Math.round((mdCol.offsetWidth / wrap.offsetWidth) * 100));
+    }
+  });
+})();
+
 // ── Compare versions ──────────────────────────────────────────────────────────
 let _compareMode = 'diff';
+let _lastCompareRes = null;
 
 function openCompareModal() {
   if (!_promptVersions.length) { flash('prompt-status', '⚠ No versions yet', 'text-amber-500'); return; }
@@ -1550,6 +2825,8 @@ function openCompareModal() {
     aSel.value = sorted[0].version;
     bSel.value = sorted[0].version;
   }
+  const cur = getSelectedPromptVersion();
+  if (cur && sorted.some(v => v.version === cur)) bSel.value = cur;
   document.getElementById('compare-modal').classList.remove('hidden');
   renderCompare();
 }
@@ -1560,79 +2837,77 @@ function closeCompareModal() {
 
 function setCompareMode(m) {
   _compareMode = m;
-  document.getElementById('cmp-mode-diff').style.background = m === 'diff' ? '#eef2ff' : 'white';
-  document.getElementById('cmp-mode-diff').style.color      = m === 'diff' ? '#3730a3' : '#6b7280';
-  document.getElementById('cmp-mode-side').style.background = m === 'side' ? '#eef2ff' : 'white';
-  document.getElementById('cmp-mode-side').style.color      = m === 'side' ? '#3730a3' : '#6b7280';
-  renderCompare();
+  ['diff', 'changes', 'preview'].forEach(id => {
+    const btn = document.getElementById(`cmp-mode-${id}`);
+    if (btn) btn.classList.toggle('active', id === m);
+  });
+  if (_lastCompareRes) renderCompareBody(_lastCompareRes);
+  else renderCompare();
 }
 
 function escapeHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-async function renderCompare() {
-  if (!currentUcId) return;
-  const a = +document.getElementById('cmp-a').value;
-  const b = +document.getElementById('cmp-b').value;
-  const body = document.getElementById('cmp-body');
+function renderCompareStats(res) {
   const stats = document.getElementById('cmp-stats');
-  body.innerHTML = `<div class="flex items-center gap-3 justify-center py-12 text-gray-400 text-sm">Loading…</div>`;
-  const res = await api(`/api/use-cases/${currentUcId}/prompt/diff`, {method:'POST', body: JSON.stringify({a, b})});
-  if (res.error) { body.innerHTML = `<div class="p-6 text-sm text-red-500">${res.error}</div>`; return; }
-  const adds = (res.diff||[]).filter(l => l.type === 'add').length;
-  const rems = (res.diff||[]).filter(l => l.type === 'remove').length;
-  const aLines = (res.a.content||'').split('\n').length;
-  const bLines = (res.b.content||'').split('\n').length;
+  if (!stats || !res?.a || !res?.b) return;
+  const { adds, rems } = countLineChanges(res.a.content, res.b.content);
+  const model = res.model || getOptModel() || _labModel || 'gpt-4.1';
   stats.innerHTML = `
-    <span style="color:#374151;font-weight:600;">v${res.a.version}</span> <span style="color:#9ca3af">(${aLines.toLocaleString()} lines)</span>
+    <span style="color:#374151;font-weight:600;">v${res.a.version}</span>
+    <span style="color:#9ca3af">(${res.a.lines.toLocaleString()} lines · ${res.a.tokens.toLocaleString()} tokens)</span>
     <span class="mx-2 text-gray-300">→</span>
-    <span style="color:#374151;font-weight:600;">v${res.b.version}</span> <span style="color:#9ca3af">(${bLines.toLocaleString()} lines)</span>
+    <span style="color:#374151;font-weight:600;">v${res.b.version}</span>
+    <span style="color:#9ca3af">(${res.b.lines.toLocaleString()} lines · ${res.b.tokens.toLocaleString()} tokens)</span>
     <span class="mx-3 text-gray-300">·</span>
     <span style="color:#16a34a;font-weight:600;">+${adds}</span>
     <span class="mx-1 text-gray-300">/</span>
     <span style="color:#dc2626;font-weight:600;">−${rems}</span>
-    <span class="ml-1 text-gray-400">line${(adds+rems)===1?'':'s'} changed</span>`;
+    <span class="ml-1 text-gray-400">lines changed</span>
+    <span class="mx-3 text-gray-300">·</span>
+    <span style="color:#6b7280">Model: <strong style="color:#374151">${escapeHtml(model)}</strong></span>`;
+}
 
+function renderCompareBody(res) {
+  const body = document.getElementById('cmp-body');
+  const a = +document.getElementById('cmp-a').value;
+  const b = +document.getElementById('cmp-b').value;
   if (a === b) {
     body.innerHTML = `<div class="p-6 text-sm text-gray-500 text-center">Same version selected on both sides. Pick a different version to see changes.</div>`;
     return;
   }
-
+  const oldText = res.a.content || '';
+  const newText = res.b.content || '';
   if (_compareMode === 'diff') {
-    const rows = (res.diff||[]).map(line => {
-      const t = line.type;
-      let bg = '', color = '#374151', pre = '  ';
-      if (t === 'add')     { bg = '#dcfce7'; color = '#14532d'; pre = '+ '; }
-      else if (t === 'remove') { bg = '#fee2e2'; color = '#7f1d1d'; pre = '− '; }
-      else if (t === 'header') { bg = '#eff6ff'; color = '#1e3a8a'; pre = ''; }
-      return `<div style="background:${bg};color:${color};padding:1px 12px;white-space:pre-wrap;word-break:break-word;">${escapeHtml(pre + line.text)}</div>`;
-    }).join('');
-    body.innerHTML = `<div class="font-mono" style="font-size:12px;line-height:1.6;">${rows || '<div class="p-6 text-sm text-gray-500 text-center">No differences.</div>'}</div>`;
+    body.innerHTML = renderUnifiedDiffWithWords(oldText, newText);
+  } else if (_compareMode === 'changes') {
+    body.innerHTML = renderAlignedChanges(oldText, newText);
   } else {
-    const linesA = (res.a.content||'').split('\n');
-    const linesB = (res.b.content||'').split('\n');
-    const N = Math.max(linesA.length, linesB.length);
-    let html = `<div style="display:grid;grid-template-columns:1fr 1fr;font-size:12px;line-height:1.6;" class="font-mono">`;
-    html += `<div style="background:#f9fafb;border-right:1px solid #e5e7eb;">`;
-    for (let i = 0; i < N; i++) {
-      const l = linesA[i] ?? '';
-      const r = linesB[i] ?? '';
-      const diff = l !== r;
-      const bg = diff ? '#fef2f2' : 'transparent';
-      html += `<div style="background:${bg};padding:1px 12px;white-space:pre-wrap;word-break:break-word;"><span style="color:#9ca3af;display:inline-block;width:36px;user-select:none;">${i+1}</span>${escapeHtml(l)}</div>`;
-    }
-    html += `</div><div>`;
-    for (let i = 0; i < N; i++) {
-      const l = linesA[i] ?? '';
-      const r = linesB[i] ?? '';
-      const diff = l !== r;
-      const bg = diff ? '#f0fdf4' : 'transparent';
-      html += `<div style="background:${bg};padding:1px 12px;white-space:pre-wrap;word-break:break-word;"><span style="color:#9ca3af;display:inline-block;width:36px;user-select:none;">${i+1}</span>${escapeHtml(r)}</div>`;
-    }
-    html += `</div></div>`;
-    body.innerHTML = html;
+    body.innerHTML = `<div class="cmp-grid" style="height:100%;min-height:400px">
+      <div class="flex flex-col min-h-0">
+        <div class="cmp-col-hdr">Markdown source <span style="font-weight:400;color:#9ca3af">(v${res.b.version} · changes highlighted)</span></div>
+        <div class="flex-1 overflow-auto scrollbar-thin">${renderSourceWithDiff(oldText, newText)}</div>
+      </div>
+      <div class="flex flex-col min-h-0 border-l border-gray-200">
+        <div class="cmp-col-hdr">Rendered preview <span style="font-weight:400;color:#9ca3af">(v${res.b.version})</span></div>
+        <div class="flex-1 overflow-auto scrollbar-thin">${renderPromptPreview(newText)}</div>
+      </div>
+    </div>`;
   }
+}
+
+async function renderCompare() {
+  if (!currentUcId) return;
+  const body = document.getElementById('cmp-body');
+  body.innerHTML = `<div class="flex items-center gap-3 justify-center py-12 text-gray-400 text-sm">Loading…</div>`;
+  const a = +document.getElementById('cmp-a').value;
+  const b = +document.getElementById('cmp-b').value;
+  const res = await api(`/api/use-cases/${currentUcId}/prompt/diff`, {method:'POST', body: JSON.stringify({a, b})});
+  if (res.error) { body.innerHTML = `<div class="p-6 text-sm text-red-500">${res.error}</div>`; return; }
+  _lastCompareRes = res;
+  renderCompareStats(res);
+  renderCompareBody(res);
 }
 
 // ── Prompt Parse ──────────────────────────────────────────────────────────────
@@ -1715,7 +2990,7 @@ function renderParseModal(r) {
   if (!variables.length && !tools.length && !agents.length && !kb_lookups.length) {
     body.innerHTML = `<div class="text-gray-500 text-sm text-center py-10 leading-relaxed">
       No variables or tool references detected.<br>
-      <span class="text-gray-400 text-xs">Make sure the prompt uses <code class="bg-gray-100 px-1 rounded">{{variable}}</code>, <code class="bg-gray-100 px-1 rounded">[Tool]</code>, or <code class="bg-gray-100 px-1 rounded">Call ToolName</code> syntax.</span>
+      <span class="text-gray-400 text-xs">Make sure the prompt uses <code class="bg-gray-100 px-1 rounded">${_OB}${_OB}variable${_CB}${_CB}</code>, <code class="bg-gray-100 px-1 rounded">[Tool]</code>, or <code class="bg-gray-100 px-1 rounded">Call ToolName</code> syntax.</span>
     </div>`;
   }
 }
@@ -1750,39 +3025,231 @@ async function applyParsedItems() {
 }
 
 // ── Runs history ──────────────────────────────────────────────────────────────
+// ── Runs tab state ──────────────────────────────────────────────────────────
+let _runs = [];            // cached for current agent
+let selectedRunId = null;
+let _runDetailTab = 'iterations';
+let _runExpandedIters = new Set();
+
 async function renderRuns() {
   if (!currentUcId) return;
-  const runs = await api(`/api/use-cases/${currentUcId}/runs`);
+  _runs = await api(`/api/use-cases/${currentUcId}/runs`);
   const list = document.getElementById('runs-list');
   list.innerHTML = '';
-  if (!runs.length) {
-    list.innerHTML = '<div class="text-xs text-gray-400 py-8 text-center">No runs yet</div>';
+  if (!_runs.length) {
+    list.innerHTML = '<div class="text-xs text-gray-400 py-8 text-center">No runs yet for this agent</div>';
     return;
   }
-  runs.forEach(run => {
-    const el = document.createElement('details');
-    el.className = 'bg-gray-50 border border-gray-200 rounded-xl text-xs overflow-hidden';
-    const statusCls = run.status==='done' ? 'text-green-600' : run.status==='error' ? 'text-red-500' : 'text-amber-600';
-    const statusBg  = run.status==='done' ? 'bg-green-50 border-green-200' : run.status==='error' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200';
-    el.innerHTML = `
-      <summary class="px-3.5 py-2.5 cursor-pointer list-none flex items-center gap-2 hover:bg-gray-100 transition rounded-xl">
-        <span class="font-mono text-gray-400 shrink-0">#${run.id}</span>
-        <span class="font-medium ${statusCls} flex-1">${run.status}</span>
-        <span class="font-semibold text-gray-600">${run.current_pass}/${run.total_tests}</span>
-        <span class="text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">${run.mode}</span>
-      </summary>
-      <div class="border-t border-gray-200 px-3.5 py-2.5 space-y-2 bg-white">
-        ${(run.iterations||[]).map(it => `
-          <div class="border border-gray-200 rounded-lg p-2.5 bg-gray-50">
-            <div class="flex items-center justify-between mb-1">
-              <span class="font-semibold text-gray-700">Iteration ${it.n}</span>
-              <span class="badge ${it.passed===it.total?'badge-pass':'badge-fail'}">${it.passed}/${it.total}</span>
-            </div>
-            ${it.diagnosis ? `<div class="text-gray-500 line-clamp-2 mt-1 leading-relaxed">${esc(it.diagnosis)}</div>` : ''}
-          </div>`).join('')}
+  _runs.forEach(run => {
+    const sel = run.id === selectedRunId;
+    const statusCls = run.status==='done'    ? 'text-emerald-600' :
+                      run.status==='error'   ? 'text-red-600' :
+                      run.status==='stopped' ? 'text-amber-600' :
+                      run.status==='running' ? 'text-blue-600' : 'text-gray-500';
+    const pctPass = run.total_tests ? Math.round(100 * run.current_pass / run.total_tests) : 0;
+    const barCol  = pctPass === 100 ? 'bg-emerald-500' : pctPass > 0 ? 'bg-amber-400' : 'bg-gray-300';
+    const time    = (run.ended_at || run.started_at || '').replace('T', ' ').slice(5, 16);
+    const itersCt = (run.iterations || []).length;
+
+    const btn = document.createElement('button');
+    btn.className = `w-full text-left px-3 py-2.5 rounded-lg border transition ${sel ? 'border-indigo-300 bg-indigo-50 shadow-sm' : 'border-gray-200 bg-white hover:bg-gray-50'}`;
+    btn.onclick = () => selectRun(run.id);
+    btn.innerHTML = `
+      <div class="flex items-center gap-2 mb-1.5">
+        <span class="font-mono text-[11px] text-gray-400">#${run.id}</span>
+        <span class="text-[11px] font-semibold ${statusCls}">${run.status}</span>
+        <span class="ml-auto text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200">${run.mode}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+          <div class="h-full ${barCol}" style="width:${pctPass}%"></div>
+        </div>
+        <span class="text-[11px] font-semibold text-gray-700 tabular-nums">${run.current_pass}/${run.total_tests}</span>
+      </div>
+      <div class="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
+        <span>${itersCt} iter${itersCt===1?'':'s'}</span>
+        ${time ? `<span>·</span><span>${esc(time)}</span>` : ''}
       </div>`;
-    list.appendChild(el);
+    list.appendChild(btn);
   });
+}
+
+function selectRun(runId) {
+  selectedRunId = runId;
+  _runExpandedIters = new Set();
+  renderRuns();   // refresh highlight
+  // Show run detail pane, hide others
+  document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('empty-state-runs').classList.add('hidden');
+  document.getElementById('detail-pane').classList.add('hidden');
+  document.getElementById('run-detail-pane').classList.remove('hidden');
+  renderRunDetail();
+}
+
+function showRunDetailTab(name) {
+  _runDetailTab = name;
+  ['iterations','tests','diff'].forEach(t => {
+    document.getElementById(`rdpanel-${t}`).classList.toggle('hidden', t !== name);
+    const b = document.getElementById(`rdtab-${t}`);
+    if (b) b.classList.toggle('active', t === name);
+  });
+}
+
+function _runStatusBadge(status) {
+  const m = {
+    done:    'badge-pass',
+    running: 'badge-pending',
+    paused:  'badge-pending',
+    stopped: 'badge-fail',
+    error:   'badge-fail',
+  };
+  return m[status] || 'badge-pending';
+}
+
+function renderRunDetail() {
+  const run = _runs.find(r => r.id === selectedRunId);
+  if (!run) return;
+  document.getElementById('rd-id').textContent     = `#${run.id}`;
+  const sb = document.getElementById('rd-status');
+  sb.className = `badge ${_runStatusBadge(run.status)}`;
+  sb.textContent = run.status;
+  document.getElementById('rd-mode').textContent   = run.mode;
+  document.getElementById('rd-pass').textContent   = `${run.current_pass}/${run.total_tests} passing`;
+  const iters = run.iterations || [];
+  document.getElementById('rd-name').textContent   = `${iters.length} iteration${iters.length===1?'':'s'} · max ${run.max_iterations}`;
+  const started = (run.started_at || '').replace('T',' ').slice(0,16);
+  const ended   = (run.ended_at   || '').replace('T',' ').slice(0,16);
+  document.getElementById('rd-meta').textContent   = `Started ${started || '—'}${ended ? ` · Ended ${ended}` : ''}`;
+
+  renderRunIterations(run);
+  renderRunFinalTests(run);
+  renderRunDiff(run);
+}
+
+function renderRunIterations(run) {
+  const wrap = document.getElementById('rdpanel-iterations');
+  const iters = run.iterations || [];
+  if (!iters.length) {
+    wrap.innerHTML = '<div class="text-sm text-gray-400 py-12 text-center">No iterations recorded for this run.</div>';
+    return;
+  }
+  wrap.innerHTML = iters.map(it => {
+    const allPass = it.passed === it.total;
+    const isOpen  = _runExpandedIters.has(it.n);
+    const failed  = (it.results || []).filter(r => r.overall !== 'PASS');
+    const passed  = (it.results || []).filter(r => r.overall === 'PASS');
+    return `
+      <div class="rounded-xl border ${allPass ? 'border-emerald-200 bg-emerald-50/40' : 'border-amber-200 bg-amber-50/40'} overflow-hidden">
+        <button onclick="toggleRunIter(${it.n})" class="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-black/[.02]">
+          <span class="text-gray-400 text-xs">${isOpen ? '▾' : '▸'}</span>
+          <span class="font-semibold text-sm text-gray-800">Iteration ${it.n}</span>
+          <span class="badge ${allPass ? 'badge-pass' : 'badge-fail'}">${it.passed}/${it.total}</span>
+          ${it.diagnosis && !isOpen ? `<span class="text-xs text-gray-500 truncate flex-1 ml-2">${esc(it.diagnosis.slice(0,120))}${it.diagnosis.length>120?'…':''}</span>` : '<span class="flex-1"></span>'}
+          <span class="text-[10px] text-gray-400">${esc((it.created_at || '').replace('T',' ').slice(5,16))}</span>
+        </button>
+        ${isOpen ? `
+          <div class="border-t border-gray-200 px-4 py-3 space-y-3 bg-white">
+            ${it.diagnosis ? `
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">Diagnosis</p>
+                <div class="text-xs leading-relaxed text-gray-700 bg-gray-50 border border-gray-200 rounded p-2.5 whitespace-pre-wrap">${esc(it.diagnosis)}</div>
+              </div>` : ''}
+
+            ${failed.length ? `
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-red-500 mb-1">Failed (${failed.length})</p>
+                <div class="space-y-1.5">
+                  ${failed.map(r => _renderRunTestRow(r)).join('')}
+                </div>
+              </div>` : ''}
+
+            ${passed.length ? `
+              <details class="text-xs">
+                <summary class="cursor-pointer text-[11px] font-bold uppercase tracking-wider text-emerald-600 mb-1">Passed (${passed.length})</summary>
+                <div class="space-y-1.5 mt-2">
+                  ${passed.map(r => _renderRunTestRow(r)).join('')}
+                </div>
+              </details>` : ''}
+
+            ${it.new_prompt && it.new_prompt !== it.prompt_text ? `
+              <details class="text-xs">
+                <summary class="cursor-pointer text-[11px] font-bold uppercase tracking-wider text-indigo-600">Prompt edits applied for next iteration</summary>
+                <div class="mt-2 max-h-72 overflow-y-auto border border-gray-200 rounded">${_diffHtml(it.prompt_text, it.new_prompt)}</div>
+              </details>` : ''}
+          </div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function _renderRunTestRow(r) {
+  const pass = r.overall === 'PASS';
+  return `
+    <div class="flex items-start gap-2 text-xs px-2.5 py-1.5 rounded-md ${pass ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}">
+      <span class="font-bold shrink-0 ${pass ? 'text-emerald-600' : 'text-red-600'}">${pass ? '✓' : '✗'}</span>
+      <div class="min-w-0 flex-1">
+        <p class="${pass ? 'text-emerald-800' : 'text-red-800'} font-medium truncate">${esc(r.tc_id || '?')} — ${esc(r.name || '')}</p>
+        ${r.summary ? `<p class="opacity-70 mt-0.5 text-[11px]">${esc(r.summary)}</p>` : ''}
+      </div>
+    </div>`;
+}
+
+function toggleRunIter(n) {
+  if (_runExpandedIters.has(n)) _runExpandedIters.delete(n);
+  else                          _runExpandedIters.add(n);
+  const run = _runs.find(r => r.id === selectedRunId);
+  if (run) renderRunIterations(run);
+}
+
+function renderRunFinalTests(run) {
+  const wrap = document.getElementById('rdpanel-tests');
+  const iters = run.iterations || [];
+  const last = iters[iters.length - 1];
+  if (!last || !(last.results || []).length) {
+    wrap.innerHTML = '<div class="text-sm text-gray-400 py-12 text-center">No test results captured for this run.</div>';
+    return;
+  }
+  const results = last.results;
+  const pass = results.filter(r => r.overall === 'PASS').length;
+  wrap.innerHTML = `
+    <div class="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+      <div class="badge ${pass === results.length ? 'badge-pass' : 'badge-fail'}">${pass}/${results.length} passing</div>
+      <span class="text-xs text-gray-500">final iteration (#${last.n})</span>
+    </div>
+    ${results.map(r => _renderRunTestRow(r)).join('')}`;
+}
+
+function renderRunDiff(run) {
+  const wrap = document.getElementById('rdpanel-diff');
+  const iters = run.iterations || [];
+  if (iters.length < 2 && !(iters[0] && iters[0].new_prompt)) {
+    wrap.innerHTML = '<div class="text-sm text-gray-400 py-12 text-center font-sans">Run had no prompt changes (or only one iteration).</div>';
+    return;
+  }
+  // Compare first iteration's input prompt with last iteration's output prompt.
+  const a = (iters[0] || {}).prompt_text || '';
+  const last = iters[iters.length - 1] || {};
+  const b = last.new_prompt || last.prompt_text || '';
+  wrap.innerHTML = `
+    <div class="text-[11px] text-gray-500 font-sans mb-2">Comparing the prompt at the start of iteration 1 with the prompt at the end of iteration ${last.n}.</div>
+    ${_diffHtml(a, b)}`;
+}
+
+function _diffHtml(a, b) {
+  // Minimal client-side line diff (LCS-free, equality-based) good enough for display.
+  const aL = (a || '').split('\n');
+  const bL = (b || '').split('\n');
+  const out = [];
+  const max = Math.max(aL.length, bL.length);
+  for (let i = 0; i < max; i++) {
+    const la = aL[i]; const lb = bL[i];
+    if (la === lb) {
+      if (la !== undefined) out.push(`<div class="text-gray-500 px-2 py-0.5">${esc(la)}</div>`);
+    } else {
+      if (la !== undefined) out.push(`<div class="bg-red-50 text-red-800 px-2 py-0.5">- ${esc(la)}</div>`);
+      if (lb !== undefined) out.push(`<div class="bg-emerald-50 text-emerald-800 px-2 py-0.5">+ ${esc(lb)}</div>`);
+    }
+  }
+  return `<div class="border border-gray-200 rounded overflow-hidden">${out.join('')}</div>`;
 }
 
 // ── Use case management ───────────────────────────────────────────────────────
@@ -1985,6 +3452,11 @@ async function saveSettings() {
     yellowai_api_key: document.getElementById('cfg-yellowai-key').value.trim(),
     base_url:         document.getElementById('cfg-base-url').value.trim(),
   })});
+  _labModel = document.getElementById('cfg-model').value.trim() || 'gpt-4.1';
+  if (!localStorage.getItem('opt-model')) {
+    optModelId = _labModel;
+    renderOptModelSelect();
+  }
   const s = document.getElementById('settings-status');
   s.textContent = '✓ Settings saved'; s.className = 'text-sm flex-1 text-green-600';
   setTimeout(closeSettings, 800);
@@ -1997,10 +3469,8 @@ function toggleVis(id, btn) {
 
 // ── Yellow.ai paste cleaner ───────────────────────────────────────────────────
 // Converts Yellow.ai rich-text chip format back to plain double-brace varName syntax
-// Note: brace chars built at runtime to prevent Jinja2 from parsing them as template vars
-const _OB = '{', _CB = '}'; // { and }
 function cleanFromYellowAi(text) {
-  // Variable chips: "{} varName string" → "{{varName}}"
+  // Variable chips: "{} varName string" → double-brace varName syntax
   text = text.replace(
     /\{\}\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+(?:string|number|boolean|object|array|String|Number|Boolean|Object|Array)\b/g,
     (_, name) => _OB + _OB + name + _CB + _CB
@@ -2127,7 +3597,7 @@ function yaiCopy(text, el) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeSettings(); closeNewUcModal(); closeParseModal(); closeCompareModal(); closeYaiMapModal();
-    closeManageUcModal(); closeConfirm(); closeUcDropdown();
+    closeManageUcModal(); closeConfirm(); closeUcDropdown(); closeVerDropdown();
     document.getElementById('step-modal').classList.add('hidden');
   }
 });
@@ -2140,13 +3610,18 @@ document.getElementById('yai-map-modal').addEventListener('click', function(e){ 
 document.getElementById('compare-modal').addEventListener('click', function(e){ if(e.target===this)closeCompareModal(); });
 document.getElementById('new-uc-name').addEventListener('keydown', e=>{ if(e.key==='Enter')submitNewUc(); });
 
-// Close the agent dropdown when clicking outside it.
+// Close dropdowns when clicking outside them.
 document.addEventListener('click', function(e){
-  const dd = document.getElementById('uc-dropdown');
-  const trig = document.getElementById('uc-trigger');
-  if (!dd || dd.classList.contains('hidden')) return;
-  if (dd.contains(e.target) || trig.contains(e.target)) return;
-  closeUcDropdown();
+  const ucDd = document.getElementById('uc-dropdown');
+  const ucTrig = document.getElementById('uc-trigger');
+  if (ucDd && !ucDd.classList.contains('hidden')) {
+    if (!ucDd.contains(e.target) && !ucTrig.contains(e.target)) closeUcDropdown();
+  }
+  const verDd = document.getElementById('ver-dropdown');
+  const verTrig = document.getElementById('ver-trigger');
+  if (verDd && !verDd.classList.contains('hidden')) {
+    if (!verDd.contains(e.target) && !verTrig.contains(e.target)) closeVerDropdown();
+  }
 });
 
 // ── Sidebar resize ────────────────────────────────────────────────────────────
@@ -2154,10 +3629,6 @@ document.addEventListener('click', function(e){
   const handle  = document.getElementById('sidebar-resize-handle');
   const sidebar = document.getElementById('sidebar');
   let startX, startW;
-
-  // Restore saved width
-  const saved = localStorage.getItem('sidebar-width');
-  if (saved) sidebar.style.width = saved;
 
   handle.addEventListener('mousedown', e => {
     window._sidebarResizing = true;
@@ -2171,7 +3642,8 @@ document.addEventListener('click', function(e){
 
   document.addEventListener('mousemove', e => {
     if (!window._sidebarResizing) return;
-    const newW = Math.max(260, Math.min(900, startW + (e.clientX - startX)));
+    const minW = currentSideTab === 'prompt' ? 240 : 260;
+    const newW = Math.max(minW, Math.min(900, startW + (e.clientX - startX)));
     sidebar.style.width = newW + 'px';
   });
 
@@ -2181,12 +3653,372 @@ document.addEventListener('click', function(e){
     handle.style.background = 'transparent';
     document.body.style.cursor     = '';
     document.body.style.userSelect = '';
-    localStorage.setItem('sidebar-width', sidebar.style.width);
+    const key = currentSideTab === 'prompt' ? 'sidebar-width-versions' : 'sidebar-width';
+    localStorage.setItem(key, sidebar.style.width);
   });
 })();
+
+// ── Acceptance rules (Tests-tab modal + Rules-tab list) ─────────────────────
+let _acceptCtx = null;
+
+function _buildActualForCriterion(s) {
+  // Stitch transcript bot messages so the LLM suggester has context.
+  const lines = [];
+  (s.transcript || []).forEach(e => {
+    if (e.type === 'bot_message') lines.push(`Turn ${e.turn} bot: ${e.bot}`);
+    else if (e.type === 'tool_call') lines.push(`Turn ${e.turn} tool: ${e.tool}`);
+  });
+  return lines.join('\n');
+}
+
+function _buildConversationTurns(s) {
+  // Build structured turns array: [{user, expected, bot}, ...]
+  const turns = [];
+  let currentUser = '', currentExpected = '';
+  (s.transcript || []).forEach(e => {
+    if (e.type === 'user_message') { currentUser = e.user || ''; currentExpected = e.expected || ''; }
+    else if (e.type === 'bot_message' && currentUser) {
+      turns.push({ user: currentUser, expected: currentExpected, bot: e.bot || '' });
+      currentUser = ''; currentExpected = '';
+    }
+  });
+  return turns;
+}
+
+async function openAcceptanceModal(idx) {
+  if (!currentUcId) { alert('Select an agent first.'); return; }
+  const s  = testStatus[selectedTc];
+  const cr = s?.results?.[idx];
+  if (!cr) return;
+  const criterion      = cr.criterion || '';
+  const llmReason      = cr.reason || '';
+  const actualResponse = _buildActualForCriterion(s);
+  const conversationTurns = _buildConversationTurns(s);
+  _acceptCtx = { ucId: currentUcId, testId: selectedTc, criterion, llmReason, actualResponse, conversationTurns };
+
+  document.getElementById('acc-criterion').textContent = criterion;
+  document.getElementById('acc-reason').textContent    = llmReason || '(no reason given)';
+  document.getElementById('acc-actual').textContent    = actualResponse;
+  document.getElementById('acc-rule').value            = '';
+  document.getElementById('acc-scope-agent').checked   = true;
+  document.getElementById('acc-status').textContent    = 'Suggesting rule…';
+  document.getElementById('acc-modal').classList.remove('hidden');
+
+  try {
+    const r = await fetch('/api/acceptance-rules/suggest', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ criterion, llm_reason: llmReason, actual_response: actualResponse }),
+    });
+    const j = await r.json();
+    if (j.suggestion) document.getElementById('acc-rule').value = j.suggestion;
+    document.getElementById('acc-status').textContent = j.suggestion ? '' : '(no suggestion — write your own)';
+  } catch (e) {
+    document.getElementById('acc-status').textContent = '(suggestion failed — write your own)';
+  }
+}
+
+function closeAcceptanceModal() {
+  document.getElementById('acc-modal').classList.add('hidden');
+  _acceptCtx = null;
+}
+
+async function saveAcceptanceRule() {
+  if (!_acceptCtx) return;
+  const rule = (document.getElementById('acc-rule').value || '').trim();
+  if (!rule) { document.getElementById('acc-status').textContent = 'Please write a rule.'; return; }
+  const scope = document.getElementById('acc-scope-test').checked ? 'test' : 'agent';
+  document.getElementById('acc-status').textContent = 'Saving…';
+  try {
+    const r = await fetch(`/api/use-cases/${_acceptCtx.ucId}/acceptance-rules`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        human_rule: rule, scope, source: 'api',
+        source_test_id: _acceptCtx.testId,
+        criterion: _acceptCtx.criterion,
+        llm_reason: _acceptCtx.llmReason,
+        actual_response: _acceptCtx.actualResponse,
+        conversation_turns: _acceptCtx.conversationTurns || [],
+      }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    closeAcceptanceModal();
+  } catch (e) {
+    document.getElementById('acc-status').textContent = 'Save failed: ' + e.message;
+  }
+}
+
+// ── Rules tab state ─────────────────────────────────────────────────────────
+let _rulesByAgent = [];   // [{uc:{id,name}, rules:[...]}, ...]
+let _rulesExpanded = new Set();   // uc ids currently expanded
+
+// ── Knowledge base (accepted tests + LLM-derived rubric) ─────────────────────
+
+async function loadKnowledge() {
+  const noAgent = document.getElementById('knowledge-no-agent');
+  const content = document.getElementById('knowledge-content');
+  if (!currentUcId) {
+    noAgent.classList.remove('hidden');
+    content.classList.add('hidden');
+    return;
+  }
+  noAgent.classList.add('hidden');
+  content.classList.remove('hidden');
+  document.getElementById('knowledge-summary').textContent = 'Loading…';
+  document.getElementById('knowledge-msg').textContent = '';
+  try {
+    const k = await api(`/api/use-cases/${currentUcId}/knowledge`);
+    const n = k.accepted_tests_count || 0;
+    const when = k.exported_at ? ` (last update ${new Date(k.exported_at).toLocaleString()})` : '';
+    document.getElementById('knowledge-summary').innerHTML =
+      n === 0
+        ? '<span class="text-gray-500">No accepted tests yet.</span>'
+        : `<b>${n}</b> accepted test case${n === 1 ? '' : 's'}${when}`;
+    const rubricEl = document.getElementById('knowledge-rubric');
+    rubricEl.textContent = k.rubric && k.rubric.trim()
+      ? k.rubric
+      : 'No rubric yet — upload accepted tests or add acceptance rules to seed it.';
+  } catch (e) {
+    document.getElementById('knowledge-summary').textContent = 'Failed to load: ' + e.message;
+  }
+}
+
+async function uploadKnowledge(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = '';                              // reset so the same file can be re-picked
+  if (!file || !currentUcId) return;
+  if (!file.name.toLowerCase().endsWith('.json')) {
+    setKnowledgeMsg('Only .json files are accepted. For old PDFs run scripts/pdf_to_json.py first.', 'error');
+    return;
+  }
+  setKnowledgeMsg('Uploading…', 'info');
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const resp = await fetch(`/api/use-cases/${currentUcId}/knowledge/upload`, {
+      method: 'POST', body: fd,
+    });
+    const j = await resp.json();
+    if (!resp.ok) throw new Error(j.error || 'upload failed');
+    setKnowledgeMsg(`✓ Merged — ${j.accepted_tests_count} total cases. Rebuilding rubric in the background…`, 'success');
+    // Poll the rubric a couple of times to reflect the rebuild
+    setTimeout(loadKnowledge, 1500);
+    setTimeout(loadKnowledge, 5000);
+  } catch (e) {
+    setKnowledgeMsg('Upload failed: ' + e.message, 'error');
+  }
+}
+
+async function rebuildRubric() {
+  if (!currentUcId) return;
+  setKnowledgeMsg('Rebuilding rubric…', 'info');
+  try {
+    const r = await api(`/api/use-cases/${currentUcId}/knowledge/rebuild`, {method:'POST'});
+    document.getElementById('knowledge-rubric').textContent =
+      r.rubric && r.rubric.trim() ? r.rubric : 'No rubric generated (no evidence yet).';
+    setKnowledgeMsg(r.has_rubric ? '✓ Rubric updated.' : 'No evidence to derive a rubric from.', 'success');
+  } catch (e) {
+    setKnowledgeMsg('Rebuild failed: ' + e.message, 'error');
+  }
+}
+
+async function clearKnowledge() {
+  if (!currentUcId) return;
+  if (!confirm('Delete all accepted tests AND the rubric for this agent? Acceptance rules are kept.')) return;
+  try {
+    await api(`/api/use-cases/${currentUcId}/knowledge`, {method:'DELETE'});
+    setKnowledgeMsg('Cleared.', 'success');
+    loadKnowledge();
+  } catch (e) {
+    setKnowledgeMsg('Clear failed: ' + e.message, 'error');
+  }
+}
+
+function setKnowledgeMsg(msg, kind) {
+  const el = document.getElementById('knowledge-msg');
+  const color = kind === 'error' ? '#b91c1c' : kind === 'success' ? '#047857' : '#4b5563';
+  el.style.color = color;
+  el.textContent = msg;
+}
+
+async function loadAcceptanceRulesList() {
+  const list    = document.getElementById('rules-list');
+  const summary = document.getElementById('rules-summary');
+  list.innerHTML = '<p class="text-sm text-gray-400">Loading…</p>';
+  try {
+    // Fetch all agents; for each, fetch its rules in parallel.
+    const ucs = await api('/api/use-cases');
+    const ruleSets = await Promise.all(ucs.map(u =>
+      api(`/api/use-cases/${u.id}/acceptance-rules`).catch(() => [])
+    ));
+    _rulesByAgent = ucs.map((u, i) => ({uc: u, rules: ruleSets[i] || []}))
+                       .sort((a, b) => b.rules.length - a.rules.length || a.uc.name.localeCompare(b.uc.name));
+    // Auto-expand the agent the user is currently on, if it has rules
+    if (currentUcId) _rulesExpanded.add(currentUcId);
+    // Also auto-expand any agent that has rules (for first-time discoverability)
+    _rulesByAgent.forEach(g => { if (g.rules.length > 0) _rulesExpanded.add(g.uc.id); });
+
+    const totalRules    = _rulesByAgent.reduce((s, g) => s + g.rules.length, 0);
+    const totalActive   = _rulesByAgent.reduce((s, g) => s + g.rules.filter(r => r.active).length, 0);
+    const agentsWith    = _rulesByAgent.filter(g => g.rules.length > 0).length;
+    summary.textContent = `${totalRules} rule${totalRules===1?'':'s'} (${totalActive} active) across ${agentsWith} agent${agentsWith===1?'':'s'}.`;
+    renderRulesList();
+  } catch (e) {
+    list.innerHTML = `<p class="text-sm text-red-500">Failed to load: ${esc(e.message)}</p>`;
+    summary.textContent = '';
+  }
+}
+
+function renderRulesList() {
+  const list = document.getElementById('rules-list');
+  const showInactive = document.getElementById('rules-show-inactive')?.checked;
+  const q = (document.getElementById('rules-search')?.value || '').trim().toLowerCase();
+
+  if (!_rulesByAgent.length) {
+    list.innerHTML = '<p class="text-sm text-gray-500">No agents found.</p>';
+    return;
+  }
+  const groups = _rulesByAgent
+    .map(g => ({
+      uc: g.uc,
+      rules: g.rules.filter(r => (showInactive || r.active) &&
+                                  (!q ||
+                                    (r.human_rule || '').toLowerCase().includes(q) ||
+                                    (r.criterion || '').toLowerCase().includes(q) ||
+                                    g.uc.name.toLowerCase().includes(q))),
+    }))
+    .filter(g => g.rules.length > 0 || (q === '' && !showInactive ? false : true));   // hide empty agents unless searching/inactive
+
+  // When no search: show all agents that have rules; collapse empty ones.
+  const visible = q === '' && !showInactive
+      ? _rulesByAgent.filter(g => g.rules.length > 0)
+      : groups;
+
+  if (!visible.length) {
+    list.innerHTML = `<div class="bg-white border border-dashed border-gray-300 rounded-lg p-6 text-center">
+      <p class="text-sm text-gray-600 mb-1">No rules yet.</p>
+      <p class="text-xs text-gray-500">Go to <b>Tests</b> or <b>Live Test</b>, find a failed criterion, and click <b>“⚑ LLM was wrong — accept this”</b> to add one.</p>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = visible.map(g => {
+    const isOpen  = _rulesExpanded.has(g.uc.id);
+    const rules   = (q === '' && !showInactive)
+      ? g.rules.filter(r => r.active)
+      : g.rules.filter(r => (showInactive || r.active) &&
+                              (!q ||
+                                (r.human_rule || '').toLowerCase().includes(q) ||
+                                (r.criterion || '').toLowerCase().includes(q) ||
+                                g.uc.name.toLowerCase().includes(q)));
+    const activeCnt = g.rules.filter(r => r.active).length;
+    const totalCnt  = g.rules.length;
+    return `
+      <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <button onclick="toggleRulesAgent(${g.uc.id})"
+                class="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 text-left">
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="text-gray-400 text-xs">${isOpen ? '▾' : '▸'}</span>
+            <span class="font-medium text-sm text-gray-800 truncate">${esc(g.uc.name)}</span>
+            ${totalCnt ? `<span class="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">${activeCnt}${activeCnt!==totalCnt ? ` / ${totalCnt}` : ''} rule${totalCnt===1?'':'s'}</span>` : '<span class="text-[11px] text-gray-400">no rules</span>'}
+          </div>
+          <span class="text-[11px] text-gray-400">agent #${g.uc.id}</span>
+        </button>
+        ${isOpen ? `
+          <div class="border-t border-gray-100 px-4 py-3 space-y-2 bg-gray-50">
+            ${rules.length ? rules.map(r => _renderRuleRow(r)).join('') :
+              '<p class="text-xs text-gray-500 italic">No matching rules in this agent.</p>'}
+          </div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function _renderRuleRow(r) {
+  const dim = r.active ? '' : 'opacity-60';
+  return `
+    <div class="bg-white border border-gray-200 rounded-lg p-3 ${dim}">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm text-gray-800 leading-snug">${esc(r.human_rule)}</p>
+          <div class="text-[11px] text-gray-500 mt-1.5 flex flex-wrap gap-1.5 items-center">
+            <span class="px-1.5 py-0.5 rounded ${r.scope==='test'?'bg-amber-50 text-amber-700 border border-amber-200':'bg-emerald-50 text-emerald-700 border border-emerald-200'}">${r.scope==='test' ? 'test: '+esc(r.source_test_id || '?') : 'agent-wide'}</span>
+            ${r.source ? `<span class="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200">via ${esc(r.source)}</span>` : ''}
+            ${!r.active ? '<span class="px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">disabled</span>' : ''}
+            <span class="text-gray-400">${esc((r.created_at || '').slice(0,16))}</span>
+          </div>
+          ${r.criterion ? `<details class="mt-1.5"><summary class="text-[11px] text-gray-500 cursor-pointer hover:text-gray-700">Origin →</summary>
+            <div class="text-[11px] text-gray-600 mt-1 pl-3 border-l-2 border-gray-200">
+              <p><b>Criterion:</b> ${esc(r.criterion)}</p>
+              ${r.llm_reason ? `<p class="mt-0.5"><b>LLM said:</b> ${esc(r.llm_reason)}</p>` : ''}
+            </div></details>` : ''}
+        </div>
+        <div class="flex flex-col gap-1 shrink-0">
+          <button onclick="toggleAcceptanceRule(${r.id}, ${r.active ? 0 : 1})"
+                  class="text-[11px] px-2 py-1 rounded border border-gray-300 hover:bg-gray-50">${r.active ? 'Disable' : 'Enable'}</button>
+          <button onclick="deleteAcceptanceRule(${r.id})"
+                  class="text-[11px] px-2 py-1 rounded border border-red-300 text-red-700 hover:bg-red-50">Delete</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function toggleRulesAgent(ucId) {
+  if (_rulesExpanded.has(ucId)) _rulesExpanded.delete(ucId);
+  else                          _rulesExpanded.add(ucId);
+  renderRulesList();
+}
+
+function filterRulesList() { renderRulesList(); }
+
+async function toggleAcceptanceRule(id, active) {
+  await api(`/api/acceptance-rules/${id}`, {method:'PATCH', body: JSON.stringify({active: !!active})});
+  loadAcceptanceRulesList();
+}
+
+async function deleteAcceptanceRule(id) {
+  if (!confirm('Delete this rule?')) return;
+  await api(`/api/acceptance-rules/${id}`, {method:'DELETE'});
+  loadAcceptanceRulesList();
+}
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 init();
 </script>
+
+<!-- Acceptance Rule Modal ───────────────────────────────────────────────── -->
+<div id="acc-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.5)">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+      <h2 class="text-base font-semibold">Mark verdict as wrong — add acceptance rule</h2>
+      <button onclick="closeAcceptanceModal()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
+    </div>
+    <div class="px-6 py-4 space-y-4">
+      <div>
+        <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Criterion</p>
+        <p id="acc-criterion" class="text-sm text-gray-800"></p>
+      </div>
+      <div>
+        <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">LLM said FAIL because</p>
+        <p id="acc-reason" class="text-sm text-gray-700"></p>
+      </div>
+      <div>
+        <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Bot actually said / showed</p>
+        <pre id="acc-actual" class="text-xs text-gray-700 bg-gray-50 border border-gray-200 rounded p-2 whitespace-pre-wrap max-h-40 overflow-y-auto"></pre>
+      </div>
+      <div>
+        <label class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Acceptance rule (one short sentence — LLM-suggested, editable)</label>
+        <textarea id="acc-rule" rows="3" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="e.g. Carousel cards count as listing items."></textarea>
+        <p id="acc-status" class="text-[11px] text-gray-500 mt-1"></p>
+      </div>
+      <div class="flex items-center gap-4 text-sm">
+        <label class="flex items-center gap-1.5"><input type="radio" name="acc-scope" id="acc-scope-agent" value="agent" checked> Agent-wide</label>
+        <label class="flex items-center gap-1.5"><input type="radio" name="acc-scope" id="acc-scope-test" value="test"> This test only</label>
+      </div>
+    </div>
+    <div class="px-6 py-3 border-t border-gray-200 flex items-center justify-end gap-2">
+      <button onclick="closeAcceptanceModal()" class="px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50">Cancel</button>
+      <button onclick="saveAcceptanceRule()" class="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">Save rule</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

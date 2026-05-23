@@ -46,9 +46,12 @@ INPUT_SELECTORS = [
     "[class*='ym-input'] input",
 ]
 
-YAI_BOT_MSG_SEL = "[class*='yai-group'][class*='yai-items-start']"
+# V3 (current) widget uses [data-testid="message-*"]. Older widgets used the
+# Tailwind class pattern below — we keep both, preferring testid.
+YAI_BOT_MSG_SEL = "[data-testid='message-agent'], [class*='yai-group'][class*='yai-items-start']"
 
 YAI_USER_MSG_SELECTORS = [
+    "[data-testid='message-user']",
     "[class*='yai-group'][class*='yai-items-end']",
     "[class*='yai-items-end']",
     "[class*='user-message']",
@@ -132,8 +135,27 @@ async def _find_first(ctx, selectors: list, timeout_each: int = 3000):
 # classified as "user" via class names OR computed-style alignment so it
 # works across all Yellow.ai V3 widget variants.
 _JS_ALL_MESSAGES = """() => {
-    const groups = Array.from(document.querySelectorAll('[class*="yai-group"]'));
+    // V3 widget: each message is tagged via [data-testid="message-agent"] or
+    // [data-testid="message-user"]. These are stable across releases.
+    // Older widgets used the yai-group class pattern — we keep it as fallback.
     const out = [];
+
+    // ── Preferred: data-testid (V3 current) ──────────────────────────────────
+    const v3 = document.querySelectorAll('[data-testid="message-agent"], [data-testid="message-user"]');
+    if (v3.length) {
+        for (const el of v3) {
+            const role = el.dataset.testid === 'message-user' ? 'user' : 'bot';
+            // Prefer the message-*-text child if present (excludes action buttons
+            // like copy/like/dislike, which are siblings inside the bubble).
+            const inner = el.querySelector('[data-testid="message-agent-text"], [data-testid="message-user-text"]')
+                       || el;
+            out.push({ role, text: (inner.innerText || '').trim() });
+        }
+        return out;
+    }
+
+    // ── Fallback: legacy yai-group class pattern ─────────────────────────────
+    const groups = Array.from(document.querySelectorAll('[class*="yai-group"]'));
     for (const g of groups) {
         const cls = g.className || '';
         let st = {};
@@ -144,8 +166,7 @@ _JS_ALL_MESSAGES = """() => {
                     || st.justifyContent === 'flex-end'
                     || st.alignSelf === 'flex-end'
                     || st.marginLeft === 'auto';
-        const txt = (g.innerText || '').trim();
-        out.push({ role: isUser ? 'user' : 'bot', text: txt });
+        out.push({ role: isUser ? 'user' : 'bot', text: (g.innerText || '').trim() });
     }
     return out;
 }"""
@@ -179,10 +200,23 @@ def _norm(s: str) -> str:
 
 async def _snapshot_bot_texts(page) -> set[str]:
     """Snapshot all bot message texts currently in the DOM (normalized).
-    Used to filter out welcome messages and replayed history from response capture."""
+    Used to filter out welcome messages and replayed history from response capture.
+    Stores both full text and a short prefix key for fuzzy matching."""
     msgs = await _get_all_messages(page)
-    return {_norm(m.get("text") or "") for m in msgs
-            if m.get("role") == "bot" and len((m.get("text") or "").strip()) > 1}
+    out: set[str] = set()
+    for m in msgs:
+        if m.get("role") != "bot":
+            continue
+        txt = (m.get("text") or "").strip()
+        if len(txt) <= 1:
+            continue
+        normed = _norm(txt)
+        out.add(normed)
+        # Also store a short prefix for fuzzy matching — welcome messages
+        # may get extra whitespace or trailing chars on re-render
+        if len(normed) > 20:
+            out.add(normed[:80])
+    return out
 
 
 _GREETING_PATTERNS = [
@@ -199,13 +233,16 @@ def _is_greeting(text: str) -> bool:
 
 
 def _strip_greeting_from_response(texts: list[str], is_first_turn: bool) -> list[str]:
-    """Remove greeting messages from a multi-message bot response on the first turn.
-    Only strips if there are multiple messages AND the first one is a greeting —
-    never strips the only response message."""
-    if not is_first_turn or len(texts) <= 1:
-        return texts
-    if _is_greeting(texts[0]):
-        return texts[1:]
+    """
+    No-op kept for call-site compatibility.
+
+    Earlier versions stripped ANY greeting-looking text on the first turn, but
+    that swallowed legitimate fallback responses (e.g. the bot replying
+    "Hey there, welcome…" when the user's input is ambiguous and no agent
+    matches). The pre_send_texts snapshot in _wait_for_response already
+    handles dedup of the genuine welcome message that loads on page open,
+    so this extra filter only ever produced false negatives.
+    """
     return texts
 
 
@@ -527,6 +564,62 @@ async def _get_button_labels(page) -> list[str]:
     return [label for label, _ in await _get_visible_buttons(page)]
 
 
+async def _get_button_labels_after_user(page, user_msg: str) -> list[str]:
+    """Get button labels that appear AFTER the current user bubble in the DOM.
+    This ensures we only capture buttons belonging to the current turn's response,
+    not stale buttons from previous turns."""
+    ym_frame = await _get_ym_frame(page)
+    if not ym_frame:
+        return []
+    js = """(userMsg) => {
+        const groups = Array.from(document.querySelectorAll('[class*="yai-group"]'));
+        const target = (userMsg || '').trim().toLowerCase();
+        // Find the LAST user bubble matching userMsg
+        let anchorIdx = -1;
+        for (let i = 0; i < groups.length; i++) {
+            const cls = groups[i].className || '';
+            const st = window.getComputedStyle(groups[i]);
+            const isUser = cls.includes('items-end') || cls.includes('justify-end')
+                        || st.alignItems === 'flex-end' || st.justifyContent === 'flex-end'
+                        || st.alignSelf === 'flex-end' || st.marginLeft === 'auto';
+            if (!isUser) continue;
+            const txt = (groups[i].innerText || '').trim().toLowerCase();
+            if (target && (txt === target || txt.includes(target) || target.includes(txt))) {
+                anchorIdx = i;
+            }
+        }
+        if (anchorIdx === -1) return [];
+        // Collect all buttons in bot groups AFTER the anchor
+        const labels = [];
+        const seen = new Set();
+        for (let i = anchorIdx + 1; i < groups.length; i++) {
+            const cls = groups[i].className || '';
+            const st = window.getComputedStyle(groups[i]);
+            const isUser = cls.includes('items-end') || cls.includes('justify-end')
+                        || st.alignItems === 'flex-end' || st.justifyContent === 'flex-end'
+                        || st.alignSelf === 'flex-end' || st.marginLeft === 'auto';
+            if (isUser) break;  // Stop at next user bubble
+            const btns = groups[i].querySelectorAll('button, [role="button"], a[class*="btn"], a[class*="button"]');
+            for (const btn of btns) {
+                const t = (btn.innerText || '').trim();
+                if (t && t.length < 100 && t.length > 0
+                    && !['send','submit'].includes(t.toLowerCase())
+                    && !seen.has(t)) {
+                    seen.add(t);
+                    labels.push(t);
+                }
+            }
+        }
+        return labels;
+    }"""
+    try:
+        result = await ym_frame.evaluate(js, user_msg)
+        return result or []
+    except Exception as e:
+        print(f"[pw] _get_button_labels_after_user error: {e}")
+        return []
+
+
 def _is_bracketed_action(s: str) -> bool:
     """Check if a user message is a bracketed action instruction like [Shares live location]."""
     s = s.strip()
@@ -614,14 +707,16 @@ def _fuzzy_button_match(target: str, btn_label: str, is_action: bool = False) ->
 
 
 async def _click_button_by_label(page, label: str) -> bool:
-    """Click ANY visible button matching label (flexible matching).
-    Strips brackets from test script actions and uses fuzzy matching to handle
-    slight wording differences between test scripts and actual button text.
-    For bracketed actions like [Shares live location], extracts keywords and
-    matches against visible buttons using stemming."""
+    """Click a visible button matching label, but ONLY if it belongs to the
+    LAST bot message group in the DOM (the most recent bot response).
+    This prevents clicking stale buttons from earlier turns.
+    Strips brackets from test script actions and uses fuzzy matching."""
     is_action = _is_bracketed_action(label)
     raw_target = _strip_brackets(label)
-    for btn_label, btn_el in await _get_visible_buttons(page):
+
+    # Get buttons scoped to the last bot message group only
+    last_turn_buttons = await _get_last_turn_buttons(page)
+    for btn_label, btn_el in last_turn_buttons:
         if _fuzzy_button_match(raw_target, btn_label, is_action=is_action):
             try:
                 await btn_el.click()
@@ -632,97 +727,376 @@ async def _click_button_by_label(page, label: str) -> bool:
     return False
 
 
-async def _get_carousel_texts(page) -> list[str]:
+async def _get_last_turn_buttons(page) -> list[tuple[str, object]]:
+    """Get buttons only from the LAST bot message group in the DOM.
+    This ensures we never click stale buttons from previous turns."""
+    ym_frame = await _get_ym_frame(page)
+    if not ym_frame:
+        return []
+
+    # Find the last bot message group in the DOM
+    try:
+        # Get all yai-groups, find the last bot one
+        last_bot_idx = await ym_frame.evaluate("""() => {
+            const groups = Array.from(document.querySelectorAll('[class*="yai-group"]'));
+            let lastBotIdx = -1;
+            for (let i = groups.length - 1; i >= 0; i--) {
+                const cls = groups[i].className || '';
+                const st = window.getComputedStyle(groups[i]);
+                const isUser = cls.includes('items-end') || cls.includes('justify-end')
+                            || st.alignItems === 'flex-end' || st.justifyContent === 'flex-end'
+                            || st.alignSelf === 'flex-end' || st.marginLeft === 'auto';
+                if (!isUser) { lastBotIdx = i; break; }
+            }
+            if (lastBotIdx >= 0) {
+                groups[lastBotIdx].setAttribute('data-yk-last-bot-group', '1');
+            }
+            return lastBotIdx;
+        }""")
+    except Exception:
+        return []
+
+    if last_bot_idx < 0:
+        return []
+
+    buttons: list[tuple[str, object]] = []
+    seen: set[str] = set()
+    for sel in ALL_BUTTON_SELECTORS:
+        try:
+            els = await ym_frame.locator(
+                f"[data-yk-last-bot-group='1'] {sel}"
+            ).all()
+            for el in els:
+                try:
+                    if not await el.is_visible():
+                        continue
+                    t = (await el.inner_text()).strip()
+                    if t and len(t) < 100 and t.lower() not in {"send", "submit"} and t not in seen:
+                        seen.add(t)
+                        buttons.append((t, el))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    # Clean up the tag
+    try:
+        await ym_frame.evaluate(
+            "() => { const el = document.querySelector('[data-yk-last-bot-group]'); "
+            "if (el) el.removeAttribute('data-yk-last-bot-group'); }"
+        )
+    except Exception:
+        pass
+
+    return buttons
+
+
+# ── Carousel / widget capture ────────────────────────────────────────────────
+#
+# Yellow.ai V3 widget structure (verified live):
+#
+#   data-testid="message-agent"          — a bot message bubble (text OR widget)
+#     └── data-testid="message-agent-widget"   — a rich card (image + title +
+#                                                 subtitle + N buttons)
+#
+#   Multi-card carousels are paginated, not stacked — only the CURRENTLY VISIBLE
+#   card is in the DOM. Navigation arrows (aria-label="Previous card" /
+#   "Next card") cycle through cards.
+#
+# Capture strategy:
+#   1. Find all message-agent-widget elements inside the LAST bot message group.
+#   2. For each widget, extract structured fields (title, subtitle, button
+#      labels) — NOT the raw innerText, which would duplicate everything.
+#   3. If "Next card" arrow exists and is enabled, click it, wait for the new
+#      card to render, capture it, repeat until the arrow disables or stops
+#      progressing. Cap at 8 cards as a safety limit.
+
+# CSS selector for the next-card navigation arrow.
+# Covers all known aria-label and class-name variants across Yellow.ai widget versions.
+_NEXT_CARD_SELECTOR = (
+    "button[aria-label='Next card'], button[aria-label='next card' i], "
+    "button[aria-label='Next'], button[aria-label='next' i], "
+    "button[aria-label='Next slide'], button[aria-label='next slide' i], "
+    "button[aria-label='next item' i], button[aria-label='forward' i], "
+    "[class*='next-card'], [class*='nextCard'], [class*='next-slide'], "
+    "[class*='carousel-next'], [class*='slick-next'], [class*='swiper-next'], "
+    "[data-testid*='next-card'], [data-testid*='nextCard']"
+)
+
+# JS fallback: find the next-arrow ONLY within the tagged carousel message.
+# Intentionally conservative — only matches buttons with "next" in aria/class
+# OR small icon-only buttons (arrow icons, not readable quick-reply labels).
+# Never falls back to "rightmost button" to avoid clicking quick replies.
+_JS_FIND_NEXT_ARROW = """() => {
+    const msg = document.querySelector('[data-yk-last-widget-msg]');
+    if (!msg) return null;
+    const btns = Array.from(msg.querySelectorAll('button'));
+    // 1. aria-label contains "next"
+    const byAria = btns.find(b => /next/i.test(b.getAttribute('aria-label') || ''));
+    if (byAria) return byAria;
+    // 2. class name contains "next"
+    const byCls = btns.find(b => /next/i.test(b.className || ''));
+    if (byCls) return byCls;
+    // 3. Small icon-only button (no readable text, likely SVG arrow) on the right side
+    const iconBtns = btns.filter(b => {
+        const r = b.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) return false;
+        const text = (b.innerText || '').trim();
+        // Must be a small button (< 56px) with no readable label or only an arrow char
+        return r.width < 56 && (text.length === 0 || /^[>›→❯]$/.test(text));
+    });
+    if (iconBtns.length > 0) {
+        // Pick the rightmost one — that's the forward/next arrow
+        iconBtns.sort((a, b) => b.getBoundingClientRect().left - a.getBoundingClientRect().left);
+        return iconBtns[0];
+    }
+    return null;
+}"""
+
+# JS to tag the correct bot message for the current turn that contains a
+# valid carousel widget (heading/image required — pure-button widgets are
+# quick-reply containers, not carousel cards).
+# Parameters: userMsg (str), anchorSelector (str for the user-group class)
+_JS_TAG_CAROUSEL_MSG = """(userMsg) => {
+    // Step 1: find the last user bubble that contains userMsg.
+    // Uses the SAME robust user-detection as _JS_ALL_MESSAGES (class + computed style).
+    let anchorEl = null;
+    if (userMsg && userMsg.trim()) {
+        const snippet = userMsg.trim().slice(0, 60).toLowerCase();
+        const groups = Array.from(document.querySelectorAll('[class*="yai-group"]'));
+        for (let i = groups.length - 1; i >= 0; i--) {
+            const g = groups[i];
+            const cls = g.className || '';
+            let st = {};
+            try { st = window.getComputedStyle(g); } catch(e) {}
+            const isUser = cls.includes('items-end')
+                        || cls.includes('justify-end')
+                        || st.alignItems === 'flex-end'
+                        || st.justifyContent === 'flex-end'
+                        || st.alignSelf === 'flex-end'
+                        || st.marginLeft === 'auto';
+            if (isUser && (g.innerText || '').toLowerCase().includes(snippet)) {
+                anchorEl = g;
+                break;
+            }
+        }
+    }
+
+    // CRITICAL: if we can't find the user bubble, return false.
+    // Never search without an anchor — that picks up stale widgets from old turns.
+    if (!anchorEl) return false;
+
+    // Step 2: walk all message-agent elements in reverse (newest first).
+    // Find the last one that: (a) appears AFTER the anchor, and
+    // (b) contains a widget with a heading or image (real carousel card,
+    //     not a quick-reply container).
+    const msgs = Array.from(document.querySelectorAll('[data-testid="message-agent"]'));
+    for (let i = msgs.length - 1; i >= 0; i--) {
+        const msg = msgs[i];
+
+        // Enforce anchor: skip messages that precede the user bubble.
+        const pos = anchorEl.compareDocumentPosition(msg);
+        // Node.DOCUMENT_POSITION_FOLLOWING = 4  (msg comes after anchor)
+        if (!(pos & 4)) continue;
+
+        const widget = msg.querySelector('[data-testid="message-agent-widget"]');
+        if (!widget) continue;
+
+        // Validate: a real carousel card must have a visible heading or image.
+        // A widget that contains ONLY buttons is a quick-reply container.
+        const hasHeading = widget.querySelector(
+            'h1,h2,h3,h4,h5,h6,[role="heading"]'
+        );
+        const hasImage = widget.querySelector('img');
+        const hasBoldText = Array.from(widget.querySelectorAll('div,span,p')).some(e =>
+            e.children.length === 0 &&
+            (e.textContent || '').trim() &&
+            parseInt(window.getComputedStyle(e).fontWeight || '400') >= 600
+        );
+
+        if (hasHeading || hasImage || hasBoldText) {
+            msg.setAttribute('data-yk-last-widget-msg', '1');
+            return true;
+        }
+    }
+    return false;
+}"""
+
+
+async def _extract_widget_struct(widget_el) -> dict:
+    """Pull structured fields from a single message-agent-widget."""
+    return await widget_el.evaluate(r"""(w) => {
+        function collapseWS(s) { return (s || '').trim().replace(/\s+/g, ' '); }
+        const imgs = Array.from(w.querySelectorAll('img'));
+        const imgAlt = imgs.map(i => i.alt || '').filter(Boolean)[0] || '';
+
+        // Title: prefer first heading; fallback to first leaf div/span/p with bold-ish weight.
+        let title = '';
+        const h = w.querySelector('h1,h2,h3,h4,h5,h6,[role="heading"]');
+        if (h) title = collapseWS(h.textContent);
+        if (!title) {
+            const leaves = Array.from(w.querySelectorAll('div,span,p')).filter(e =>
+                e.children.length === 0 && (e.textContent || '').trim());
+            for (const el of leaves) {
+                const w_ = parseInt(window.getComputedStyle(el).fontWeight || '400');
+                if (w_ >= 600) { title = collapseWS(el.textContent); break; }
+            }
+            if (!title && leaves.length) title = collapseWS(leaves[0].textContent);
+        }
+
+        // Buttons inside this widget
+        const btns = Array.from(w.querySelectorAll('button'))
+            .map(b => collapseWS(b.innerText || b.textContent || ''))
+            .filter(t => t && t.length > 0 && t.length < 120);
+
+        // Subtitle / description: any leaf text that is NOT the title and NOT a button label
+        const btnSet = new Set(btns.map(b => b.toLowerCase()));
+        const leafTexts = Array.from(w.querySelectorAll('div,span,p'))
+            .filter(e => e.children.length === 0)
+            .map(e => collapseWS(e.textContent))
+            .filter(t => t && t.toLowerCase() !== title.toLowerCase() && !btnSet.has(t.toLowerCase()));
+        const subtitle = leafTexts.length ? leafTexts[0] : '';
+
+        return {
+            title: title || (imgAlt || ''),
+            subtitle: (subtitle && subtitle !== title) ? subtitle : '',
+            image_alt: imgAlt,
+            buttons: btns,
+        };
+    }""")
+
+
+def _format_card(card: dict) -> str:
+    """Render one structured card as a single readable line."""
+    head = card.get("title", "").strip() or card.get("image_alt", "").strip() or "(card)"
+    sub  = card.get("subtitle", "").strip()
+    btns = [b for b in card.get("buttons", []) if b]
+    parts = [head]
+    if sub: parts.append(f"— {sub}")
+    line = " ".join(parts)
+    if btns:
+        line += "\n     buttons: " + " | ".join(btns)
+    return line
+
+
+async def _capture_carousel(page, user_msg: str = "", max_cards: int = 8) -> list[dict]:
     """
-    Detect a multi-card carousel via JS evaluation inside the iframe.
-    Returns [] if fewer than 2 distinct cards are found.
+    Capture the current bot turn's carousel as a list of structured cards.
+
+    Key guarantees:
+    - Anchored to the current user turn: only considers bot messages that appear
+      AFTER the current user bubble in the DOM, so stale carousels from earlier
+      turns are never mistaken for the current response.
+    - Card validation: a widget element is only treated as a carousel card if it
+      contains a heading, image, or bold text.  Pure-button widgets (quick-reply
+      containers) are rejected and left to _get_button_labels.
+    - Safe arrow navigation: the next-card JS fallback only clicks small icon-only
+      buttons; it never clicks readable quick-reply labels.
     """
     ym_frame = await _get_ym_frame(page)
     if not ym_frame:
         return []
 
-    _JS_FIND_CAROUSEL = """() => {
-        function collapseWS(s) { return (s || '').trim().replace(/\\s+/g, ' '); }
-        function findCardGroup(root, depth) {
-            if (!root || depth > 8) return null;
-            const children = Array.from(root.children);
-            if (children.length >= 2) {
-                const tags = new Set(children.map(c => c.tagName));
-                if (tags.size <= 2) {
-                    const texts = children.map(c => collapseWS(c.textContent)).filter(t => t.length > 8);
-                    const uniq = [...new Set(texts)];
-                    if (uniq.length >= 2 && uniq.some(t => t.length > 20)) return uniq;
-                }
-            }
-            for (const child of children) {
-                if (child.children.length > 0) {
-                    const found = findCardGroup(child, depth + 1);
-                    if (found) return found;
-                }
-            }
-            return null;
-        }
-        const botSelectors = [
-            '[class*="yai-group"][class*="yai-items-start"]',
-            '[class*="yai-items-start"]',
-            '[class*="bot-message"]',
-            '[class*="received"]',
-        ];
-        let lastGroup = null;
-        for (const sel of botSelectors) {
-            const matches = document.querySelectorAll(sel);
-            if (matches.length > 0) { lastGroup = matches[matches.length - 1]; break; }
-        }
-        if (lastGroup) {
-            const result = findCardGroup(lastGroup, 0);
-            if (result && result.length >= 2) return result;
-        }
-        const allEls = Array.from(document.querySelectorAll('*'));
-        for (const el of allEls) {
-            const st = window.getComputedStyle(el);
-            const isHScroll = st.overflowX === 'auto' || st.overflowX === 'scroll';
-            const hasSnapClass = (el.className || '').includes('snap') ||
-                                 (el.className || '').includes('scroll') ||
-                                 (el.className || '').includes('overflow');
-            if (!isHScroll && !hasSnapClass) continue;
-            const children = Array.from(el.children);
-            if (children.length < 2) continue;
-            const texts = children.map(c => collapseWS(c.textContent)).filter(t => t.length > 8);
-            const uniq = [...new Set(texts)];
-            if (uniq.length >= 2 && uniq.some(t => t.length > 20)) return uniq;
-        }
-        return [];
-    }"""
-
+    # Always clean up any tag left by a previous run first.
     try:
-        cards: list = await ym_frame.evaluate(_JS_FIND_CAROUSEL)
-        if cards and len(cards) >= 2:
-            seen: set[str] = set()
-            return [c for c in cards if c and not (c in seen or seen.add(c))]
-    except Exception as e:
-        print(f"[pw] carousel JS eval error: {e}")
+        await ym_frame.evaluate(
+            "() => { const el = document.querySelector('[data-yk-last-widget-msg]'); "
+            "if (el) el.removeAttribute('data-yk-last-widget-msg'); }"
+        )
+    except Exception:
+        pass
 
-    for sel in CAROUSEL_CARD_SELECTORS:
+    # Locate the CURRENT TURN's bot message that contains a valid carousel card.
+    # _JS_TAG_CAROUSEL_MSG anchors to the current user bubble and validates that
+    # the widget has heading/image content (not just buttons).
+    try:
+        found = await ym_frame.evaluate(_JS_TAG_CAROUSEL_MSG, user_msg)
+    except Exception:
+        found = False
+    if not found:
+        return []
+
+    cards: list[dict] = []
+    seen_signatures: set[str] = set()
+
+    for _ in range(max_cards):
+        # Locate the visible widget inside the tagged message.
         try:
-            els = await ym_frame.locator(sel).all()
-            if len(els) < 2:
-                continue
-            texts2: list[str] = []
-            for el in els:
-                try:
-                    t = (await el.text_content() or "").strip()
-                    t = " ".join(t.split())
-                    if t and len(t) > 5:
-                        texts2.append(t)
-                except Exception:
-                    pass
-            seen2: set[str] = set()
-            uniq2 = [t for t in texts2 if not (t in seen2 or seen2.add(t))]
-            if len(uniq2) >= 2:
-                return uniq2
+            widget = ym_frame.locator(
+                "[data-yk-last-widget-msg='1'] [data-testid='message-agent-widget']"
+            ).first
+            if not await widget.is_visible(timeout=600):
+                break
+        except Exception:
+            break
+
+        try:
+            card = await _extract_widget_struct(widget)
+        except Exception as e:
+            print(f"[pw] widget extract error: {e}")
+            break
+
+        # Skip cards that have no title/image (pure-button widget = quick replies)
+        if not (card.get("title") or card.get("image_alt")):
+            print("[pw] widget has no title/image — treating as quick-reply container, skipping")
+            break
+
+        sig = (card.get("title", "") + "|" + "|".join(card.get("buttons", []))).strip()
+        if not sig or sig in seen_signatures:
+            break   # Carousel did not advance — we've seen all cards
+        seen_signatures.add(sig)
+        cards.append(card)
+        print(f"[pw] carousel card {len(cards)}: {card.get('title', '(no title)')}")
+
+        # Advance to the next card.
+        # Strategy 1: CSS selector (aria-label / class variants)
+        # Strategy 2: JS fallback (icon-only small buttons only — never quick-reply labels)
+        clicked = False
+        try:
+            next_btn = ym_frame.locator(_NEXT_CARD_SELECTOR).first
+            if await next_btn.is_visible(timeout=400):
+                disabled     = await next_btn.get_attribute("disabled")
+                aria_disabled = await next_btn.get_attribute("aria-disabled")
+                if disabled is None and not (aria_disabled and aria_disabled.lower() == "true"):
+                    await next_btn.click(timeout=2000)
+                    clicked = True
         except Exception:
             pass
-    return []
+
+        if not clicked:
+            try:
+                el = await ym_frame.evaluate_handle(_JS_FIND_NEXT_ARROW)
+                if el:
+                    obj = el.as_element()
+                    if obj and await obj.is_visible():
+                        await obj.click(timeout=2000)
+                        clicked = True
+            except Exception:
+                pass
+
+        if not clicked:
+            break   # No navigation arrow found — single card or last card
+        await asyncio.sleep(0.7)   # Wait for the next card to render
+
+    # Cleanup tag
+    try:
+        await ym_frame.evaluate(
+            "() => { const el = document.querySelector('[data-yk-last-widget-msg]'); "
+            "if (el) el.removeAttribute('data-yk-last-widget-msg'); }"
+        )
+    except Exception:
+        pass
+
+    if cards:
+        print(f"[pw] carousel: captured {len(cards)} card(s)")
+    return cards
+
+
+# Kept for backward compatibility with older callers; returns the structured
+# cards rendered as text lines. New code should call _capture_carousel directly.
+async def _get_carousel_texts(page, user_msg: str = "") -> list[str]:
+    cards = await _capture_carousel(page, user_msg=user_msg)
+    return [_format_card(c) for c in cards]
 
 
 async def _is_bot_thinking(page) -> bool:
@@ -777,7 +1151,8 @@ async def _wait_for_response(page, user_msg: str, start_index: int,
                               timeout_sec: float = RESPONSE_TIMEOUT,
                               on_thinking_start=None,
                               pre_send_texts: set[str] | None = None,
-                              is_button_click: bool = False) -> list[str]:
+                              is_button_click: bool = False,
+                              is_first_turn: bool = False) -> list[str]:
     """
     Wait until the bot finishes responding, then return ONLY the bot messages
     for the CURRENT turn.
@@ -809,9 +1184,40 @@ async def _wait_for_response(page, user_msg: str, start_index: int,
     _pre = pre_send_texts or set()
 
     def _filter(texts: list[str]) -> list[str]:
+        # The only legitimate filter is "drop bot messages that already existed
+        # in the DOM BEFORE we sent the user message" (welcome message, replayed
+        # history). We intentionally do NOT strip greeting-shaped text on the
+        # first turn — if the bot's actual response uses "welcome"/"how can I
+        # help" wording (e.g. ambiguous-intent fallback), that IS the response
+        # and must be returned to the caller.
         if not _pre:
             return texts
-        filtered = [t for t in texts if _norm(t) not in _pre]
+        def _in_pre(t):
+            nt = _norm(t)
+            if nt in _pre:
+                return True
+            # Fuzzy: substring containment, prefix match, or high word overlap
+            for p in _pre:
+                if len(p) < 10:
+                    continue
+                # Exact substring either direction
+                if p in nt or nt in p:
+                    return True
+                # Prefix match (first 60 chars) — catches re-rendered text
+                if nt[:60] == p[:60]:
+                    return True
+                # Word overlap — if 80%+ words match, it's the same message
+                nt_words = set(nt.split())
+                p_words = set(p.split())
+                if nt_words and p_words:
+                    overlap = len(nt_words & p_words)
+                    if overlap / max(1, min(len(nt_words), len(p_words))) > 0.8:
+                        return True
+            return False
+        filtered = [t for t in texts if not _in_pre(t)]
+        if len(filtered) < len(texts):
+            dropped = len(texts) - len(filtered)
+            print(f"[pw] _filter: dropped {dropped} pre-existing text(s)")
         return filtered
 
     async def _capture() -> list[str]:
@@ -1108,15 +1514,28 @@ async def _prepare_page_for_test(page, bot_url: str, max_attempts: int = 3):
     last_err: str = "unknown"
     for attempt in range(1, max_attempts + 1):
         try:
-            await page.goto(bot_url, wait_until="load", timeout=45_000)
+            # Use "domcontentloaded" instead of "load" — the Yellow.ai liveBot
+            # page keeps the load event pending on slow third-party scripts
+            # (analytics, etc.) and will hit the 45s timeout on a normal
+            # network. We don't need the load event — we only care that the
+            # HTML is parsed; the widget iframe is awaited separately below.
+            await page.goto(bot_url, wait_until="domcontentloaded", timeout=45_000)
         except Exception as e:
-            last_err = f"navigation failed: {e}"
-            print(f"[pw] _prepare_page (attempt {attempt}): {last_err}")
-            await asyncio.sleep(1.0)
-            continue
+            # On timeout, fall back to "commit" (HTML headers received) so we
+            # can still try to find the widget on a slow/flaky network.
+            print(f"[pw] _prepare_page (attempt {attempt}): goto domcontentloaded failed: {e}")
+            try:
+                await page.goto(bot_url, wait_until="commit", timeout=20_000)
+            except Exception as e2:
+                last_err = f"navigation failed: {e2}"
+                print(f"[pw] _prepare_page (attempt {attempt}): goto commit also failed: {e2}")
+                await asyncio.sleep(1.0)
+                continue
 
         iframe_seen = False
-        for _ in range(30):
+        # Up to ~20s for the widget iframe — covers slow first paint after
+        # we drop the load-event wait above.
+        for _ in range(66):
             if await _get_ym_frame(page):
                 iframe_seen = True
                 break
@@ -1127,6 +1546,15 @@ async def _prepare_page_for_test(page, bot_url: str, max_attempts: int = 3):
             print(f"[pw] _prepare_page (attempt {attempt}): {last_err}")
             await asyncio.sleep(1.0)
             continue
+
+        # Force the widget iframe visible — nexus.yellow.ai/liveBot sets it
+        # display:none by default; without this the input is never found.
+        await page.evaluate("""() => {
+            const iframe = document.querySelector('#ym-widget-v3-frame');
+            if (iframe) {
+                iframe.style.cssText = 'display:block !important; position:fixed; bottom:0; right:0; width:420px; height:700px; z-index:9999; border:none;';
+            }
+        }""")
 
         await asyncio.sleep(0.3)
         if await _open_widget(page, max_wait_sec=15.0):
@@ -1152,11 +1580,20 @@ async def _run_one_test(page, test: dict, eq: queue.Queue,
     turns = test.get("turns", [])
 
     # Wait until the widget is fully idle so the welcome message and any
-    # replayed history have rendered. The snapshot taken before each send will
-    # exclude these from the captured response.
+    # replayed history have rendered.
     await asyncio.sleep(0.5)
     await _wait_for_widget_idle(page, max_wait_sec=15.0, stable_window=2.0)
+    # Extra wait + re-check to guarantee the welcome message is fully in DOM
+    await asyncio.sleep(1.5)
+    await _wait_for_widget_idle(page, max_wait_sec=5.0, stable_window=1.5)
     prev_user_bubble = await _get_user_bubble_count(page)
+
+    # ── Capture the welcome/initial bot text as a permanent exclusion set ──
+    # This is taken ONCE before any user message is sent. Every bot message
+    # currently in the DOM is a welcome/greeting/replayed message and must
+    # NEVER appear as a response to any turn.
+    welcome_texts = await _snapshot_bot_texts(page)
+    print(f"[pw] welcome exclusion set: {len(welcome_texts)} texts captured")
 
     for i, turn in enumerate(turns):
         user_msg = turn.get("user", "")
@@ -1190,9 +1627,11 @@ async def _run_one_test(page, test: dict, eq: queue.Queue,
 
         # ── Record message-group count and snapshot bot texts BEFORE sending ──
         # The snapshot captures all bot texts currently in the DOM so they can
-        # be filtered from the response (handles welcome msgs + replayed history).
+        # be filtered from the response. Always include the welcome exclusion
+        # set so it's impossible for the welcome message to leak through.
         start_index = await _count_message_groups(page)
         pre_send_texts = await _snapshot_bot_texts(page)
+        pre_send_texts = pre_send_texts | welcome_texts   # always exclude welcome
         print(f"[pw] turn {i+1}: start_index={start_index}, "
               f"pre_send snapshot has {len(pre_send_texts)} bot texts")
 
@@ -1236,20 +1675,63 @@ async def _run_one_test(page, test: dict, eq: queue.Queue,
             on_thinking_start=_pre_type_next,
             pre_send_texts=pre_send_texts,
             is_button_click=clicked_button,
+            is_first_turn=(i == 0),
         )
 
         # ── Strip greeting from first turn if it slipped past the filter ─────
         response_texts = _strip_greeting_from_response(response_texts, is_first_turn=(i == 0))
 
-        # ── Append buttons and carousel ─────────────────────────────────────
-        labels = await _get_button_labels(page)
-        carousel = await _get_carousel_texts(page)
+        # ── Append carousel (structured) and quick-reply buttons ─────────────
+        # Carousels come first because we may need to strip their button labels
+        # from the global button list to avoid duplication.
+        # Pass user_msg so the carousel capture anchors to the current turn.
+        cards = await _capture_carousel(page, user_msg=user_msg)
+
+        # Collect quick-reply / page-level button labels SCOPED to this turn —
+        # only buttons that appear after the current user bubble in the DOM.
+        # Falls back to global button list if scoped capture returns nothing
+        # and there's no user_msg to anchor to.
+        labels = await _get_button_labels_after_user(page, user_msg)
+        if not labels and not user_msg:
+            labels = await _get_button_labels(page)
+        if cards:
+            card_btn_set = {b.strip().lower()
+                            for c in cards for b in c.get("buttons", []) if b}
+            labels = [l for l in labels if l.strip().lower() not in card_btn_set]
+
+        # If the response_texts include text that exactly equals or is fully
+        # contained in a card's structured fields, drop it — the card already
+        # represents that content and we don't want to duplicate.
+        if cards and response_texts:
+            card_text_blobs = []
+            for c in cards:
+                blob = " ".join(filter(None, [
+                    c.get("title", ""), c.get("subtitle", ""),
+                    *c.get("buttons", []),
+                ])).lower()
+                card_text_blobs.append(blob)
+            def _is_card_dup(t: str) -> bool:
+                tl = " ".join(t.split()).lower()
+                if len(tl) < 5:
+                    return False
+                for blob in card_text_blobs:
+                    # treat as dup if the bot text is dominated by card content
+                    overlap = sum(1 for tok in tl.split() if tok in blob)
+                    if overlap and overlap / max(1, len(tl.split())) > 0.85:
+                        return True
+                return False
+            response_texts = [t for t in response_texts if not _is_card_dup(t)]
+
         actual = " | ".join(response_texts) if response_texts else "(no response captured)"
+
+        if cards:
+            n = len(cards)
+            actual += f"\n[carousel ({n} card{'s' if n != 1 else ''}):"
+            for c in cards:
+                actual += "\n - " + _format_card(c)
+            actual += "]"
         if labels:
             actual = actual + "\n[buttons: " + " | ".join(labels) + "]"
-        if carousel:
-            actual = (actual + f"\n[carousel cards ({len(carousel)}):\n - "
-                      + "\n - ".join(carousel) + "]")
 
         # ── Single-agent scope guardrail ─────────────────────────────────────
         is_boundary = (test.get("category", "") == "boundary_route")
@@ -1327,10 +1809,16 @@ async def _run_session(run_id: int, tests: list, bot_id: str, mode: str,
 
                 # New context per test — guarantees no session bleed.
                 # Grant geolocation so "Share My Location" buttons work.
+                # Real Chrome UA prevents Yellow.ai "Connection lost" in headless mode.
                 ctx = await browser.new_context(
                     viewport={"width": 1280, "height": 800},
                     geolocation={"latitude": 12.9716, "longitude": 77.5946},
                     permissions=["geolocation"],
+                    user_agent=(
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/124.0.0.0 Safari/537.36"
+                    ),
                 )
                 page = await ctx.new_page()
 
@@ -1370,6 +1858,8 @@ async def _run_session(run_id: int, tests: list, bot_id: str, mode: str,
                         client, model,
                         behavior_expectations=test.get("agent_behavior_expectations", []),
                         other_agent_context=other_agent_context,
+                        use_case_id=uc_id,
+                        test_id=tc_id,
                     )
                     overall = ev.get("overall", "ERROR")
                     summary = ev.get("summary", "")
@@ -1385,6 +1875,12 @@ async def _run_session(run_id: int, tests: list, bot_id: str, mode: str,
                       "expected": t["expected"], "actual": t["actual"]}
                      for t in turns_result],
                     overall, summary,
+                    turn_verdicts=ev.get("turn_verdicts", []),
+                    criteria_results=ev.get("criteria_results", []),
+                    behavior_results=ev.get("behavior_results", []),
+                    pass_criteria=test.get("pass_criteria", []),
+                    behavior_expectations=test.get("agent_behavior_expectations", []),
+                    category=test.get("category", ""),
                 )
                 db.update_playwright_run(run_id, passed=passed, failed=failed)
 
@@ -1418,6 +1914,7 @@ def start_playwright_run(run_id: int, tests: list, bot_id: str, mode: str,
     Synchronous wrapper — creates a fresh asyncio event loop, runs the
     Playwright session to completion, then puts the pw_done sentinel.
     """
+    import sys, traceback
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -1427,6 +1924,21 @@ def start_playwright_run(run_id: int, tests: list, bot_id: str, mode: str,
                          single_agent_name=single_agent_name,
                          other_agent_context=other_agent_context)
         )
+    except BaseException as exc:
+        # Catch BaseException so KeyboardInterrupt / CancelledError surface too.
+        tb = traceback.format_exc()
+        print(f"[pw_runner] run {run_id} crashed: {type(exc).__name__}: {exc}\n{tb}",
+              flush=True, file=sys.stderr)
+        try:
+            eq.put({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
+        except Exception:
+            pass
     finally:
-        loop.close()
-        eq.put({"type": "pw_done", "run_id": run_id})
+        try:
+            loop.close()
+        except Exception:
+            pass
+        try:
+            eq.put({"type": "pw_done", "run_id": run_id})
+        except Exception:
+            pass

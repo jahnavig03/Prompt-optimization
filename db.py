@@ -117,17 +117,43 @@ CREATE TABLE IF NOT EXISTS playwright_runs (
 );
 
 CREATE TABLE IF NOT EXISTS playwright_results (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    run_id        INTEGER NOT NULL REFERENCES playwright_runs(id) ON DELETE CASCADE,
-    use_case_id   INTEGER,
-    use_case_name TEXT DEFAULT '',
-    test_id       TEXT NOT NULL,
-    name          TEXT NOT NULL,
-    turns         TEXT NOT NULL DEFAULT '[]',
-    overall       TEXT NOT NULL DEFAULT 'pending',
-    summary       TEXT DEFAULT '',
-    created_at    TEXT DEFAULT (datetime('now'))
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id           INTEGER NOT NULL REFERENCES playwright_runs(id) ON DELETE CASCADE,
+    use_case_id      INTEGER,
+    use_case_name    TEXT DEFAULT '',
+    test_id          TEXT NOT NULL,
+    name             TEXT NOT NULL,
+    turns            TEXT NOT NULL DEFAULT '[]',
+    overall          TEXT NOT NULL DEFAULT 'pending',
+    summary          TEXT DEFAULT '',
+    -- LLM-judge verdict details so the "Pass Criteria" / "Agent Behavior" /
+    -- per-turn badges survive page reloads and past-run navigation.
+    turn_verdicts    TEXT NOT NULL DEFAULT '[]',
+    criteria_results TEXT NOT NULL DEFAULT '[]',
+    behavior_results TEXT NOT NULL DEFAULT '[]',
+    pass_criteria    TEXT NOT NULL DEFAULT '[]',
+    behavior_expectations TEXT NOT NULL DEFAULT '[]',
+    category         TEXT DEFAULT '',
+    created_at       TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS acceptance_rules (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    use_case_id     INTEGER NOT NULL REFERENCES use_cases(id) ON DELETE CASCADE,
+    source          TEXT DEFAULT '',           -- "api" | "playwright"
+    source_run_id   INTEGER,
+    source_test_id  TEXT DEFAULT '',
+    criterion       TEXT DEFAULT '',           -- the failing criterion/expected
+    llm_reason      TEXT DEFAULT '',           -- what the LLM said was wrong
+    actual_response TEXT DEFAULT '',           -- what the bot actually said/showed
+    human_rule      TEXT NOT NULL,             -- short rule the LLM will read
+    scope           TEXT NOT NULL DEFAULT 'agent',  -- "agent" | "test"
+    active          INTEGER NOT NULL DEFAULT 1,
+    created_at      TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_acceptance_rules_uc
+    ON acceptance_rules(use_case_id, active);
 """
 
 @contextmanager
@@ -155,6 +181,16 @@ def init_db(seed_dir: Path | None = None):
             "ALTER TABLE tests ADD COLUMN category TEXT NOT NULL DEFAULT 'happy_path'",
             "ALTER TABLE tests ADD COLUMN agent_behavior_expectations TEXT NOT NULL DEFAULT '[]'",
             "ALTER TABLE tests ADD COLUMN setup_notes TEXT DEFAULT ''",
+            # Persist LLM judge details so the criteria block survives reloads
+            "ALTER TABLE playwright_results ADD COLUMN turn_verdicts TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE playwright_results ADD COLUMN criteria_results TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE playwright_results ADD COLUMN behavior_results TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE playwright_results ADD COLUMN pass_criteria TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE playwright_results ADD COLUMN behavior_expectations TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE playwright_results ADD COLUMN category TEXT DEFAULT ''",
+            # Store full conversation turns with acceptance rules
+            "ALTER TABLE acceptance_rules ADD COLUMN conversation_turns TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE runs ADD COLUMN model TEXT NOT NULL DEFAULT ''",
         ]:
             try:
                 conn.execute(stmt)
@@ -398,11 +434,11 @@ def replace_tests(uc_id: int, tests: list[dict]):
 
 # ── Runs & Iterations ─────────────────────────────────────────────────────────
 
-def create_run(uc_id: int, mode: str, total_tests: int, max_iterations: int = 10) -> int:
+def create_run(uc_id: int, mode: str, total_tests: int, max_iterations: int = 10, model: str = "") -> int:
     with db() as conn:
         cur = conn.execute(
-            "INSERT INTO runs (use_case_id, mode, status, total_tests, max_iterations) VALUES (?, ?, 'running', ?, ?)",
-            (uc_id, mode, total_tests, max_iterations)
+            "INSERT INTO runs (use_case_id, mode, status, total_tests, max_iterations, model) VALUES (?, ?, 'running', ?, ?, ?)",
+            (uc_id, mode, total_tests, max_iterations, model or "")
         )
         return cur.lastrowid
 
@@ -493,14 +529,28 @@ def list_playwright_runs(limit: int = 30) -> list[dict]:
 
 def save_playwright_result(run_id: int, use_case_id, use_case_name: str,
                             test_id: str, name: str, turns: list,
-                            overall: str, summary: str) -> int:
+                            overall: str, summary: str,
+                            turn_verdicts: list | None = None,
+                            criteria_results: list | None = None,
+                            behavior_results: list | None = None,
+                            pass_criteria: list | None = None,
+                            behavior_expectations: list | None = None,
+                            category: str = "") -> int:
     with db() as conn:
         cur = conn.execute(
             "INSERT INTO playwright_results "
-            "(run_id, use_case_id, use_case_name, test_id, name, turns, overall, summary) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "(run_id, use_case_id, use_case_name, test_id, name, turns, "
+            " overall, summary, turn_verdicts, criteria_results, "
+            " behavior_results, pass_criteria, behavior_expectations, category) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (run_id, use_case_id, use_case_name, test_id, name,
-             json.dumps(turns), overall, summary),
+             json.dumps(turns), overall, summary,
+             json.dumps(turn_verdicts or []),
+             json.dumps(criteria_results or []),
+             json.dumps(behavior_results or []),
+             json.dumps(pass_criteria or []),
+             json.dumps(behavior_expectations or []),
+             category),
         )
         return cur.lastrowid
 
@@ -513,7 +563,13 @@ def get_playwright_results(run_id: int) -> list[dict]:
         result = []
         for row in rows:
             r = dict(row)
-            r["turns"] = json.loads(r.get("turns", "[]"))
+            for k in ("turns", "turn_verdicts", "criteria_results",
+                      "behavior_results", "pass_criteria",
+                      "behavior_expectations"):
+                try:
+                    r[k] = json.loads(r.get(k) or "[]")
+                except Exception:
+                    r[k] = []
             result.append(r)
         return result
 
@@ -521,3 +577,79 @@ def get_playwright_results(run_id: int) -> list[dict]:
 def delete_playwright_run(run_id: int):
     with db() as conn:
         conn.execute("DELETE FROM playwright_runs WHERE id = ?", (run_id,))
+
+
+# ── Acceptance rules ──────────────────────────────────────────────────────────
+
+def list_acceptance_rules(uc_id: int, active_only: bool = False) -> list[dict]:
+    with db() as conn:
+        q = "SELECT * FROM acceptance_rules WHERE use_case_id = ?"
+        if active_only:
+            q += " AND active = 1"
+        q += " ORDER BY id DESC"
+        return [dict(r) for r in conn.execute(q, (uc_id,)).fetchall()]
+
+
+def create_acceptance_rule(uc_id: int, human_rule: str,
+                            criterion: str = "", llm_reason: str = "",
+                            actual_response: str = "", scope: str = "agent",
+                            source: str = "", source_run_id: int | None = None,
+                            source_test_id: str = "",
+                            conversation_turns: str = "[]") -> int:
+    if scope not in ("agent", "test"):
+        scope = "agent"
+    with db() as conn:
+        cur = conn.execute(
+            "INSERT INTO acceptance_rules "
+            "(use_case_id, source, source_run_id, source_test_id, criterion, "
+            " llm_reason, actual_response, human_rule, scope, active, conversation_turns) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
+            (uc_id, source, source_run_id, source_test_id, criterion,
+             llm_reason, actual_response, human_rule, scope, conversation_turns),
+        )
+        return cur.lastrowid
+
+
+def update_acceptance_rule(rule_id: int, **kwargs):
+    allowed = {"human_rule", "scope", "active"}
+    fields = {k: v for k, v in kwargs.items() if k in allowed}
+    if not fields:
+        return
+    with db() as conn:
+        sets = ", ".join(f"{k} = ?" for k in fields)
+        conn.execute(f"UPDATE acceptance_rules SET {sets} WHERE id = ?",
+                     (*fields.values(), rule_id))
+
+
+def delete_acceptance_rule(rule_id: int):
+    with db() as conn:
+        conn.execute("DELETE FROM acceptance_rules WHERE id = ?", (rule_id,))
+
+
+def get_acceptance_rule(rule_id: int) -> dict | None:
+    with db() as conn:
+        row = conn.execute(
+            "SELECT * FROM acceptance_rules WHERE id = ?", (rule_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_acceptance_rules_for_test(uc_id: int, test_id: str | None = None) -> list[dict]:
+    """Returns active rules: all agent-wide rules + test-specific rules for this test_id."""
+    with db() as conn:
+        if test_id:
+            rows = conn.execute(
+                "SELECT * FROM acceptance_rules "
+                "WHERE use_case_id = ? AND active = 1 "
+                "  AND (scope = 'agent' OR (scope = 'test' AND source_test_id = ?)) "
+                "ORDER BY id",
+                (uc_id, test_id),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM acceptance_rules "
+                "WHERE use_case_id = ? AND active = 1 AND scope = 'agent' "
+                "ORDER BY id",
+                (uc_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]

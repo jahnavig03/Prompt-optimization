@@ -13,7 +13,9 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, render_template, request, stream_with_context
 
 import db
+import knowledge_store
 import runner
+import model_guides
 import report_pdf
 from prompt_parser import parse_prompt
 
@@ -56,6 +58,11 @@ app = Flask(__name__)
 
 # ── Boot ──────────────────────────────────────────────────────────────────────
 db.init_db(seed_dir=BASE_DIR)
+
+
+@app.route("/api/models", methods=["GET"])
+def api_list_models():
+    return jsonify(model_guides.list_models())
 
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -202,6 +209,18 @@ def api_prompt_version(uc_id, version):
     return jsonify(p)
 
 
+def _estimate_tokens(text: str) -> int:
+    """Approximate token count (cl100k_base when tiktoken is available)."""
+    if not text:
+        return 0
+    try:
+        import tiktoken
+        enc = tiktoken.get_encoding("cl100k_base")
+        return len(enc.encode(text))
+    except Exception:
+        return max(1, (len(text) + 3) // 4)
+
+
 @app.route("/api/use-cases/<int:uc_id>/prompt/diff", methods=["POST"])
 def api_prompt_diff(uc_id):
     data = request.json or {}
@@ -210,10 +229,25 @@ def api_prompt_diff(uc_id):
     pb = db.get_prompt_by_version(uc_id, int(b)) if b is not None else None
     if not pa or not pb:
         return jsonify({"error": "version not found"}), 404
+    cfg = load_config()
+    model = cfg.get("openai_model", "gpt-4.1") or "gpt-4.1"
+    content_a = pa.get("content", "") or ""
+    content_b = pb.get("content", "") or ""
     return jsonify({
-        "a": {"version": pa.get("version"), "content": pa.get("content", ""), "created_at": pa.get("created_at")},
-        "b": {"version": pb.get("version"), "content": pb.get("content", ""), "created_at": pb.get("created_at")},
-        "diff": runner.compute_diff(pa.get("content", ""), pb.get("content", "")),
+        "a": {
+            "version": pa.get("version"), "content": content_a,
+            "created_at": pa.get("created_at"),
+            "lines": len(content_a.splitlines()) or (1 if content_a else 0),
+            "tokens": _estimate_tokens(content_a),
+        },
+        "b": {
+            "version": pb.get("version"), "content": content_b,
+            "created_at": pb.get("created_at"),
+            "lines": len(content_b.splitlines()) or (1 if content_b else 0),
+            "tokens": _estimate_tokens(content_b),
+        },
+        "model": model,
+        "diff": runner.compute_diff(content_a, content_b),
     })
 
 
@@ -243,6 +277,7 @@ def api_generate_tests(uc_id):
             uc["requirements"], uc["sub_agents"], uc["memory_keys"], uc["tools"],
             OpenAI(api_key=api_key), model,
             prompt=current_prompt,
+            use_case_id=uc_id,
         )
         normalized = [
             {
@@ -269,6 +304,9 @@ def api_run_tests(uc_id):
 
     data   = request.get_json() or {}
     tc_ids = data.get("ids")  # None = all
+    _, default_model = creds
+    selected = (data.get("model") or default_model or "gpt-4.1").strip()
+    api_model, _ = model_guides.resolve_api_model(selected, default_model)
 
     for r in db.list_runs(uc_id):
         if r["status"] in ("running", "paused") and runner.get_queue(r["id"]) is not None:
@@ -283,10 +321,11 @@ def api_run_tests(uc_id):
     if tc_ids:
         tests = [t for t in tests if t["test_id"] in tc_ids]
 
-    run_id = db.create_run(uc_id, "manual", len(tests), max_iterations=1)
+    run_id = db.create_run(uc_id, "manual", len(tests), max_iterations=1, model=selected)
     eq     = runner.register_run(run_id)
 
-    api_key, model = creds
+    api_key, _ = creds
+    model = api_model
     from openai import OpenAI
 
     def _bg():
@@ -309,7 +348,8 @@ def api_run_tests(uc_id):
                 if runner._should_stop(run_id):
                     break
                 eq.put({"type": "eval_start", "tc_id": tc_id})
-                ev = runner.evaluate_transcript(result, tc["pass_criteria"], client, model)
+                ev = runner.evaluate_transcript(result, tc["pass_criteria"], client, model,
+                                                  use_case_id=uc_id, test_id=tc_id)
                 eq.put({"type": "test_complete",
                         "tc_id": tc_id, "name": tc["name"],
                         "overall": ev.get("overall", "ERROR"),
@@ -325,6 +365,8 @@ def api_run_tests(uc_id):
             eq.put({"type": "done", "run_id": run_id})
             db.update_run(run_id, status=final_status, ended_at="datetime('now')")
             runner._stop_flags.discard(run_id)
+            # ── Auto-update knowledge from simulated run results ──
+            _auto_update_knowledge_from_sim_run(run_id, uc_id)
 
     threading.Thread(target=_bg, daemon=True).start()
     return jsonify({"run_id": run_id})
@@ -340,6 +382,9 @@ def api_optimize(uc_id):
     data     = request.get_json() or {}
     mode     = data.get("mode", "auto")       # "auto" | "step"
     max_iter = int(data.get("max_iterations", 10))
+    _, default_model = creds
+    selected = (data.get("model") or default_model or "gpt-4.1").strip()
+    api_model, _ = model_guides.resolve_api_model(selected, default_model)
 
     for r in db.list_runs(uc_id):
         if r["status"] in ("running", "paused") and runner.get_queue(r["id"]) is not None:
@@ -350,7 +395,7 @@ def api_optimize(uc_id):
             }), 409
 
     tests  = db.get_tests(uc_id)
-    run_id = db.create_run(uc_id, mode, len(tests), max_iterations=max_iter)
+    run_id = db.create_run(uc_id, mode, len(tests), max_iterations=max_iter, model=selected)
     runner.register_run(run_id)
 
     threading.Thread(target=runner.run_optimization, args=(run_id, uc_id), daemon=True).start()
@@ -468,6 +513,7 @@ def api_playwright_run():
                 uc["prompt"]["content"], client, model,
                 email=cred_email, phone=cred_phone,
                 trigger=uc.get("trigger", ""),
+                use_case_id=uc_id,
             )
         except Exception as e:
             return jsonify({"error": f"Test generation failed for '{uc['name']}': {e}"}), 500
@@ -512,6 +558,7 @@ def api_playwright_run():
             "single_agent_name": single_agent_name})
 
     def _bg():
+        import sys, traceback
         try:
             pw_runner.start_playwright_run(
                 run_id, all_tests, bot_id, mode, eq, _pw_stop_flags, client, model,
@@ -519,14 +566,22 @@ def api_playwright_run():
                 single_agent_name=single_agent_name,
                 other_agent_context=other_agent_context or None,
             )
-        except Exception as exc:
-            eq.put({"type": "error", "message": str(exc)})
-            eq.put({"type": "pw_done", "run_id": run_id})
+        except BaseException as exc:
+            tb = traceback.format_exc()
+            print(f"[web_app._bg] crash run {run_id}: {type(exc).__name__}: {exc}\n{tb}",
+                  flush=True, file=sys.stderr)
+            try:
+                eq.put({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
+                eq.put({"type": "pw_done", "run_id": run_id})
+            except Exception:
+                pass
         finally:
             _pw_stop_flags.discard(run_id)
             _pw_otp_queues.pop(run_id, None)
             db.update_playwright_run(run_id, status="done",
                                      ended_at=datetime.now().isoformat())
+            # ── Auto-update knowledge: merge PASS results → rebuild rubric ──
+            _auto_update_knowledge_from_pw_run(run_id, uc_ids, bot_id)
 
     threading.Thread(target=_bg, daemon=True).start()
     return jsonify({"run_id": run_id, "total_tests": len(all_tests), "tests": all_tests})
@@ -630,6 +685,316 @@ def api_playwright_otp(run_id):
         return jsonify({"error": "No active OTP wait for this run"}), 404
     otp_q.put(otp)
     return jsonify({"ok": True})
+
+
+# ── Acceptance rules (human overrides for LLM strictness) ────────────────────
+@app.route("/api/use-cases/<int:uc_id>/acceptance-rules", methods=["GET"])
+def api_list_acceptance_rules(uc_id):
+    return jsonify(db.list_acceptance_rules(uc_id))
+
+
+@app.route("/api/use-cases/<int:uc_id>/acceptance-rules", methods=["POST"])
+def api_create_acceptance_rule(uc_id):
+    data = request.get_json() or {}
+    rule = (data.get("human_rule") or "").strip()
+    if not rule:
+        return jsonify({"error": "human_rule is required"}), 400
+    conv_turns = data.get("conversation_turns", [])
+    rule_id = db.create_acceptance_rule(
+        uc_id, rule,
+        criterion=data.get("criterion", ""),
+        llm_reason=data.get("llm_reason", ""),
+        actual_response=data.get("actual_response", ""),
+        scope=data.get("scope", "agent"),
+        source=data.get("source", ""),
+        source_run_id=data.get("source_run_id"),
+        source_test_id=data.get("source_test_id", ""),
+        conversation_turns=json.dumps(conv_turns) if isinstance(conv_turns, list) else str(conv_turns),
+    )
+    return jsonify({"id": rule_id})
+
+
+@app.route("/api/acceptance-rules/<int:rule_id>", methods=["PATCH"])
+def api_update_acceptance_rule(rule_id):
+    data = request.get_json() or {}
+    fields = {}
+    if "human_rule" in data:
+        fields["human_rule"] = (data["human_rule"] or "").strip()
+    if "scope" in data and data["scope"] in ("agent", "test"):
+        fields["scope"] = data["scope"]
+    if "active" in data:
+        fields["active"] = 1 if data["active"] else 0
+    db.update_acceptance_rule(rule_id, **fields)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/acceptance-rules/<int:rule_id>", methods=["DELETE"])
+def api_delete_acceptance_rule(rule_id):
+    db.delete_acceptance_rule(rule_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/acceptance-rules/suggest", methods=["POST"])
+def api_suggest_acceptance_rule():
+    creds = _require_key()
+    if not creds:
+        return jsonify({"error": "OpenAI API key not configured."}), 400
+    data = request.get_json() or {}
+    api_key, model = creds
+    from openai import OpenAI
+    suggestion = runner.suggest_acceptance_rule(
+        criterion=data.get("criterion", ""),
+        llm_reason=data.get("llm_reason", ""),
+        actual_response=data.get("actual_response", ""),
+        client=OpenAI(api_key=api_key), model=model,
+    )
+    return jsonify({"suggestion": suggestion})
+
+
+# ── Knowledge base (accepted tests + derived rubric / SOP) ───────────────────
+#
+# Per-agent knowledge lives at: knowledge/agent_<uc_id>/
+#   accepted_tests.json   ← uploaded JSON (or PDF→JSON converted) of passing runs
+#   rubric.md             ← LLM-distilled SOP, rebuilt after every change
+#
+# The rubric is injected into every evaluator prompt (simulation + Playwright)
+# so judgement stays consistent across runs and across bots.
+
+def _auto_update_knowledge_from_pw_run(run_id: int, uc_ids: list[int], bot_id: str) -> None:
+    """After a Playwright run completes, extract PASS results per agent,
+    merge into their knowledge store, and rebuild the rubric automatically."""
+    for uc_id in uc_ids:
+        try:
+            uc = db.get_use_case(uc_id)
+            agent_name = uc["name"] if uc else ""
+            payload = knowledge_store.export_run_as_payload(
+                uc_id, run_id, agent_name, bot_id, accepted_only=True
+            )
+            passed_tests = payload.get("accepted_tests", [])
+            if not passed_tests:
+                print(f"[knowledge] run {run_id}: no PASS results for uc={uc_id}, skipping")
+                continue
+            knowledge_store.save_accepted_tests(uc_id, payload)
+            print(f"[knowledge] run {run_id}: merged {len(passed_tests)} PASS tests for uc={uc_id}")
+            _rebuild_rubric_async(uc_id)
+        except Exception as e:
+            print(f"[knowledge] auto-update failed for uc={uc_id} run={run_id}: {e}")
+
+
+def _auto_update_knowledge_from_sim_run(run_id: int, uc_id: int) -> None:
+    """After a simulated run completes, extract PASS results,
+    merge into knowledge store, and rebuild rubric."""
+    try:
+        uc = db.get_use_case(uc_id)
+        agent_name = uc["name"] if uc else ""
+        bot_id = uc.get("bot_id", "") if uc else ""
+        iters = db.get_iterations(run_id)
+        if not iters:
+            return
+        last_iter = iters[-1]
+        results = last_iter.get("results", [])
+        tests = []
+        for r in results:
+            if (r.get("overall") or "").upper() != "PASS":
+                continue
+            transcript = r.get("transcript", [])
+            turns = []
+            user_msg, expected = "", ""
+            for entry in transcript:
+                role = entry.get("role", "")
+                content = entry.get("content", "")
+                if role == "user":
+                    user_msg = content
+                elif role == "assistant" and user_msg:
+                    turns.append({"user": user_msg, "expected": expected, "bot": content})
+                    user_msg, expected = "", ""
+            if turns:
+                tests.append({
+                    "id": r.get("tc_id", ""),
+                    "name": r.get("name", ""),
+                    "judge": (r.get("summary") or "").strip(),
+                    "turns": turns,
+                })
+        if not tests:
+            print(f"[knowledge] sim run {run_id}: no PASS results for uc={uc_id}, skipping")
+            return
+        payload = {
+            "schema_version": 1,
+            "agent": agent_name,
+            "bot_id": bot_id,
+            "use_case_id": uc_id,
+            "exported_at": datetime.now().isoformat(),
+            "accepted_tests": tests,
+        }
+        knowledge_store.save_accepted_tests(uc_id, payload)
+        print(f"[knowledge] sim run {run_id}: merged {len(tests)} PASS tests for uc={uc_id}")
+        _rebuild_rubric_async(uc_id)
+    except Exception as e:
+        print(f"[knowledge] sim auto-update failed for uc={uc_id} run={run_id}: {e}")
+
+
+def _rebuild_rubric_async(uc_id: int) -> None:
+    """Fire-and-forget rubric rebuild — runs in a thread so the request stays fast."""
+    creds = _require_key()
+    if not creds:
+        print(f"[knowledge] skipping rubric rebuild for uc={uc_id}: no OpenAI key")
+        return
+    api_key, model = creds
+    def _run():
+        try:
+            from openai import OpenAI
+            knowledge_store.rebuild_rubric(uc_id, OpenAI(api_key=api_key), model)
+        except Exception as e:
+            print(f"[knowledge] rubric rebuild failed for uc={uc_id}: {e}")
+    threading.Thread(target=_run, daemon=True).start()
+
+
+@app.route("/api/use-cases/<int:uc_id>/knowledge", methods=["GET"])
+def api_get_knowledge(uc_id):
+    doc    = knowledge_store.load_accepted_tests(uc_id)
+    rubric = knowledge_store.load_rubric(uc_id)
+    return jsonify({
+        "accepted_tests_count": len(doc.get("accepted_tests", [])),
+        "agent":                doc.get("agent", ""),
+        "bot_id":               doc.get("bot_id", ""),
+        "exported_at":          doc.get("exported_at", ""),
+        "rubric":               rubric,
+        "has_rubric":           bool(rubric.strip()),
+    })
+
+
+@app.route("/api/use-cases/<int:uc_id>/knowledge/upload", methods=["POST"])
+def api_upload_knowledge(uc_id):
+    """
+    Accepts a JSON file (multipart upload OR raw JSON body) of accepted tests.
+    Merges with existing knowledge (dedupe by test id).  Triggers rubric rebuild.
+    Reject anything that isn't valid JSON in the expected schema.
+    """
+    payload = None
+    # Multipart file upload
+    if "file" in request.files:
+        f = request.files["file"]
+        name = (f.filename or "").lower()
+        if name.endswith(".pdf"):
+            # Convert PDF to JSON in-memory
+            import tempfile
+            try:
+                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                    tmp.write(f.read())
+                    tmp_path = tmp.name
+                payload = knowledge_store.parse_lab_pdf(tmp_path)
+                os.unlink(tmp_path)
+                if not payload.get("accepted_tests"):
+                    return jsonify({"error": "No PASS test cases found in PDF."}), 400
+            except Exception as e:
+                return jsonify({"error": f"PDF parsing failed: {e}"}), 400
+        elif name.endswith(".json"):
+            try:
+                payload = json.loads(f.read().decode("utf-8"))
+            except Exception as e:
+                return jsonify({"error": f"Invalid JSON: {e}"}), 400
+        else:
+            return jsonify({"error": "Only .json or .pdf files are accepted."}), 400
+    else:
+        payload = request.get_json(silent=True)
+
+    if payload is None:
+        return jsonify({"error": "No JSON payload provided."}), 400
+
+    mode = request.args.get("mode", "merge")    # "merge" (default) | "replace"
+    try:
+        if mode == "replace":
+            doc = knowledge_store.replace_accepted_tests(uc_id, payload)
+        else:
+            doc = knowledge_store.save_accepted_tests(uc_id, payload)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    _rebuild_rubric_async(uc_id)
+    return jsonify({
+        "ok": True,
+        "accepted_tests_count": len(doc.get("accepted_tests", [])),
+        "rubric_rebuild": "scheduled",
+    })
+
+
+@app.route("/api/use-cases/<int:uc_id>/knowledge/rebuild", methods=["POST"])
+def api_rebuild_rubric(uc_id):
+    """Force a synchronous rubric rebuild and return the result."""
+    creds = _require_key()
+    if not creds:
+        return jsonify({"error": "OpenAI API key not configured."}), 400
+    api_key, model = creds
+    from openai import OpenAI
+    text = knowledge_store.rebuild_rubric(uc_id, OpenAI(api_key=api_key), model)
+    return jsonify({"rubric": text, "has_rubric": bool(text.strip())})
+
+
+@app.route("/api/use-cases/<int:uc_id>/knowledge", methods=["DELETE"])
+def api_clear_knowledge(uc_id):
+    knowledge_store.clear(uc_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/runs/<int:run_id>/export-accepted", methods=["GET"])
+def api_export_run_accepted(run_id):
+    """
+    Export a Playwright run as the accepted-tests JSON shape.  Only PASS rows
+    by default; pass ?include=all to include FAIL/ERROR too (caller's call).
+    """
+    run = db.get_run(run_id)
+    if not run:
+        return jsonify({"error": "run not found"}), 404
+    uc_id   = run.get("use_case_id")
+    uc      = db.get_use_case(uc_id) if uc_id else None
+    cfg     = load_config()
+    agent   = (uc or {}).get("name", "")
+    bot_id  = cfg.get("bot_id", "")
+    include = request.args.get("include", "passed")
+    payload = knowledge_store.export_run_as_payload(
+        uc_id, run_id, agent, bot_id, accepted_only=(include != "all"),
+    )
+    fname = f"accepted_tests_run_{run_id}.json"
+    return Response(
+        json.dumps(payload, indent=2),
+        mimetype="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+# Hook: every acceptance-rule create/update/delete kicks off a rubric rebuild
+# so the SOP saturates as the user clicks "LLM was wrong — accept this".
+_orig_create_acceptance_rule = api_create_acceptance_rule
+_orig_update_acceptance_rule = api_update_acceptance_rule
+_orig_delete_acceptance_rule = api_delete_acceptance_rule
+
+
+def _wrap_with_rebuild(view, get_uc_id):
+    def wrapped(*args, **kwargs):
+        resp = view(*args, **kwargs)
+        try:
+            uc_id = get_uc_id(*args, **kwargs)
+            if uc_id:
+                _rebuild_rubric_async(int(uc_id))
+        except Exception:
+            pass
+        return resp
+    wrapped.__name__ = view.__name__
+    return wrapped
+
+
+# Replace the registered view functions with the wrapped versions
+app.view_functions["api_create_acceptance_rule"] = _wrap_with_rebuild(
+    _orig_create_acceptance_rule, lambda uc_id: uc_id
+)
+app.view_functions["api_update_acceptance_rule"] = _wrap_with_rebuild(
+    _orig_update_acceptance_rule,
+    lambda rule_id: (db.get_acceptance_rule(rule_id) or {}).get("use_case_id"),
+)
+app.view_functions["api_delete_acceptance_rule"] = _wrap_with_rebuild(
+    _orig_delete_acceptance_rule,
+    lambda rule_id: (db.get_acceptance_rule(rule_id) or {}).get("use_case_id"),
+)
 
 
 # ── Frontend ──────────────────────────────────────────────────────────────────

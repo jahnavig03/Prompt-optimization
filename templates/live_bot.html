@@ -139,8 +139,8 @@ body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: v
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
 
-<!-- ══ Header ════════════════════════════════════════════════════════════════ -->
-<header class="flex items-center gap-3 px-5 border-b border-gray-200 bg-white shrink-0 shadow-sm" style="height:48px">
+<!-- ══ Header (hidden when embedded as ?embedded=1) ══════════════════════════ -->
+<header id="page-header" class="flex items-center gap-3 px-5 border-b border-gray-200 bg-white shrink-0 shadow-sm" style="height:48px">
   <div class="flex items-center gap-2 shrink-0">
     <div class="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold" style="background:var(--brand)">P</div>
     <span class="font-semibold text-gray-800 text-sm tracking-tight">Prompt Optimization Lab</span>
@@ -197,16 +197,6 @@ body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: v
       </div>
     </div>
 
-    <!-- Run mode -->
-    <div class="sidebar-section" style="margin-top:8px">
-      <div class="sec-hdr"><span class="sec-label">Run Mode</span></div>
-      <div class="flex items-center gap-0.5 bg-gray-100 border border-gray-200 rounded-md p-0.5 w-fit">
-        <button id="mode-headless" class="mode-btn active" onclick="setMode('headless')">Headless</button>
-        <button id="mode-browser"  class="mode-btn"        onclick="setMode('browser')">Browser</button>
-      </div>
-      <p id="mode-hint" class="text-gray-400 mt-1" style="font-size:10px">Runs silently in the background.</p>
-    </div>
-
     <!-- Credentials (auto-detected) -->
     <div id="cred-section" class="sidebar-section hidden" style="margin-top:8px">
       <div class="sec-hdr"><span class="sec-label">Test Credentials</span></div>
@@ -254,7 +244,7 @@ body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: v
 <main class="flex flex-1 min-h-0">
 
   <!-- Test list -->
-  <div id="test-list-panel" class="shrink-0 border-r border-gray-200 bg-white flex flex-col" style="width:280px;min-width:200px">
+  <div id="test-list-panel" class="shrink-0 border-r border-gray-200 bg-white flex flex-col" style="width:360px;min-width:240px">
     <div class="px-3 py-2.5 border-b border-gray-100 shrink-0 flex items-center justify-between">
       <span class="sec-label">Tests</span>
       <span id="list-count" class="text-xs text-gray-400" style="font-size:10px"></span>
@@ -328,6 +318,21 @@ body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: v
 
 <!-- ══ Script ════════════════════════════════════════════════════════════════ -->
 <script>
+// ── Embed mode (when iframed inside the Lab's Live Test tab) ─────────────────
+const IS_EMBEDDED = new URLSearchParams(window.location.search).get('embedded') === '1';
+if (IS_EMBEDDED) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const hdr = document.getElementById('page-header');
+    if (hdr) hdr.style.display = 'none';
+  });
+  window.addEventListener('message', (ev) => {
+    if (!ev.data || typeof ev.data !== 'object') return;
+    if (ev.data.type === 'livetest:run') {
+      if (typeof startRun === 'function') startRun();
+    }
+  });
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let useCases      = [];
 let selectedUcIds = new Set();
@@ -393,6 +398,18 @@ function setStatus(msg, isError = false) {
 function fmtTime(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+function runAgentLabel(r) {
+  const ids = r.use_case_ids || [];
+  if (!ids.length) return 'Unknown agent';
+  const names = ids.map(id => {
+    const uc = useCases.find(u => u.id === id);
+    return uc ? uc.name : `Agent #${id}`;
+  });
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return names.join(', ');
+  return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
 }
 
 // ── Initialisation ────────────────────────────────────────────────────────────
@@ -514,15 +531,8 @@ async function submitOtp() {
   }
 }
 
-// ── Mode toggle ───────────────────────────────────────────────────────────────
-function setMode(m) {
-  runMode = m;
-  document.getElementById('mode-headless').classList.toggle('active', m === 'headless');
-  document.getElementById('mode-browser' ).classList.toggle('active', m === 'browser');
-  document.getElementById('mode-hint').textContent = m === 'headless'
-    ? 'Runs silently in the background.'
-    : 'Opens a visible browser — watch automation live.';
-}
+// ── Mode toggle (headless-only; setMode kept as a no-op for backwards compat) ─
+function setMode(_m) { runMode = 'headless'; }
 
 // ── Run lifecycle ─────────────────────────────────────────────────────────────
 async function startRun() {
@@ -577,7 +587,8 @@ async function startRun() {
 async function stopRun() {
   if (!currentRunId) return;
   await api(`/api/playwright/stop/${currentRunId}`, { method: 'POST' });
-  setStatus('Stopping…');
+  setStatus('Stopped');
+  refreshPastRuns();
 }
 
 function downloadReport(runId) {
@@ -645,6 +656,7 @@ function handleEvent(ev) {
         testState[t.test_id] = {
           status: 'pending', overall: 'pending',
           name: t.name, ucName: t.use_case_name || '',
+          ucId: t.use_case_id || null,
           category: t.category || '',
           turns: (t.turns || []).map((tu, idx) => ({ ...tu, turn: tu.turn || idx + 1, actual: null })),
           turnVerdicts: [], criteriaResults: [], behaviorResults: [], summary: '',
@@ -700,6 +712,7 @@ function handleEvent(ev) {
         ts.turnVerdicts    = ev.turn_verdicts || [];
         ts.criteriaResults = ev.criteria_results || [];
         ts.behaviorResults = ev.behavior_results || [];
+        if (ev.use_case_id) ts.ucId = ev.use_case_id;
         if (ev.category) ts.category = ev.category;
         if (ev.turns && ev.turns.length) ts.turns = ev.turns;
       }
@@ -879,12 +892,13 @@ function renderDetail(tcId) {
   const crEl    = document.getElementById('dp-criteria');
   if (ts.criteriaResults && ts.criteriaResults.length) {
     crWrap.classList.remove('hidden');
-    crEl.innerHTML = ts.criteriaResults.map(cr => `
+    crEl.innerHTML = ts.criteriaResults.map((cr, idx) => `
       <div class="flex items-start gap-2 text-xs px-2.5 py-1.5 rounded-md ${cr.verdict === 'PASS' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}">
         <span class="font-bold shrink-0 mt-0.5 ${cr.verdict === 'PASS' ? 'text-green-600' : 'text-red-600'}">${cr.verdict === 'PASS' ? '✓' : '✗'}</span>
-        <div>
+        <div class="flex-1 min-w-0">
           <p class="${cr.verdict === 'PASS' ? 'text-green-800' : 'text-red-800'}" style="font-size:11px">${escHtml(cr.criterion)}</p>
           ${cr.reason ? `<p class="opacity-70 mt-0.5" style="font-size:10px">${escHtml(cr.reason)}</p>` : ''}
+          ${cr.verdict !== 'PASS' ? `<button onclick="openAcceptanceModal('criterion', ${idx})" class="mt-1 text-[10px] px-2 py-0.5 rounded border border-red-300 text-red-700 bg-white hover:bg-red-100">⚑ LLM was wrong — accept this</button>` : ''}
         </div>
       </div>`).join('');
   } else if (ts.passCriteria && ts.passCriteria.length && ts.overall === 'pending') {
@@ -915,12 +929,13 @@ function renderDetail(tcId) {
   if (bhEl && bhWrap) {
     if (ts.behaviorResults && ts.behaviorResults.length) {
       bhWrap.classList.remove('hidden');
-      bhEl.innerHTML = ts.behaviorResults.map(br => `
+      bhEl.innerHTML = ts.behaviorResults.map((br, idx) => `
         <div class="flex items-start gap-2 text-xs px-2.5 py-1.5 rounded-md ${br.verdict === 'PASS' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}">
           <span class="font-bold shrink-0 mt-0.5 ${br.verdict === 'PASS' ? 'text-green-600' : 'text-red-600'}">${br.verdict === 'PASS' ? '✓' : '✗'}</span>
-          <div>
+          <div class="flex-1 min-w-0">
             <p class="${br.verdict === 'PASS' ? 'text-green-800' : 'text-red-800'}" style="font-size:11px">${escHtml(br.expectation || '')}</p>
             ${br.reason ? `<p class="opacity-70 mt-0.5" style="font-size:10px">${escHtml(br.reason)}</p>` : ''}
+            ${br.verdict !== 'PASS' ? `<button onclick="openAcceptanceModal('behavior', ${idx})" class="mt-1 text-[10px] px-2 py-0.5 rounded border border-red-300 text-red-700 bg-white hover:bg-red-100">⚑ LLM was wrong — accept this</button>` : ''}
           </div>
         </div>`).join('');
     } else if (ts.behaviorExpectations && ts.behaviorExpectations.length && ts.overall === 'pending') {
@@ -952,9 +967,8 @@ function renderPastRuns(runs) {
     return `
       <div class="run-row${isActive ? ' active-run' : ''}" onclick="loadPastRun(${r.id})">
         <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-1.5">
-            <span class="font-semibold text-gray-700" style="font-size:10px">Run #${r.id}</span>
-            <span class="badge badge-${r.mode === 'headless' ? 'pending' : 'eval'}" style="font-size:9px;padding:1px 4px">${r.mode}</span>
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="font-semibold text-gray-700 truncate" style="font-size:11px" title="${escHtml(runAgentLabel(r))}">${escHtml(runAgentLabel(r))}</span>
           </div>
           <p class="text-gray-400" style="font-size:9px">${fmtTime(r.started_at)}</p>
         </div>
@@ -968,12 +982,13 @@ function renderPastRuns(runs) {
             onmouseover="this.style.borderColor='var(--brand)';this.style.color='var(--brand)'"
             onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-3)'">
             <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v9m0 0l-3-3m3 3l3-3M3 13h10"/></svg>
-          </button><button onclick="event.stopPropagation();deleteRun(${r.id})" title="Delete run"
+          </button>` : ''}
+          <button onclick="event.stopPropagation();deleteRun(${r.id})" title="Delete run"
             style="padding:3px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text-3);cursor:pointer;display:flex;align-items:center"
             onmouseover="this.style.borderColor='var(--error)';this.style.color='var(--error)'"
             onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-3)'">
             <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 4h10M6 4V3h4v1M5 4v9h6V4"/></svg>
-          </button>` : ''}
+          </button>
         </div>
       </div>`;
   }).join('');
@@ -1000,9 +1015,15 @@ async function loadPastRun(runId) {
     testState[r.test_id] = {
       status: 'done', overall: r.overall,
       name: r.name, ucName: r.use_case_name || '',
+      ucId: r.use_case_id || null,
+      category: r.category || '',
       turns: r.turns || [],
-      turnVerdicts: [], criteriaResults: [], summary: r.summary || '',
-      passCriteria: [],
+      turnVerdicts:    r.turn_verdicts    || [],
+      criteriaResults: r.criteria_results || [],
+      behaviorResults: r.behavior_results || [],
+      passCriteria:    r.pass_criteria    || [],
+      behaviorExpectations: r.behavior_expectations || [],
+      summary: r.summary || '',
     };
   });
 
@@ -1046,8 +1067,136 @@ function escHtml(s) {
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Acceptance rule modal ─────────────────────────────────────────────────────
+let _acceptCtx = null;  // {ucId, testId, criterion, llmReason, actualResponse}
+
+function _buildActualResponseText(ts) {
+  // Stitch together all bot replies in this conversation so the LLM suggester has context.
+  const parts = (ts.turns || []).map(t => `Turn ${t.turn} bot: ${t.actual || '(no response)'}`);
+  return parts.join('\n');
+}
+
+function _buildConversationTurns(ts) {
+  // Build structured turns: [{user, expected, bot}, ...]
+  return (ts.turns || []).map(t => ({
+    user: t.user || '',
+    expected: t.expected || '',
+    bot: t.actual || '',
+  }));
+}
+
+async function openAcceptanceModal(kind, idx) {
+  const ts = testState[selectedTcId];
+  if (!ts) return;
+  const ucId = ts.ucId;
+  if (!ucId) { alert('Cannot determine which agent this test belongs to.'); return; }
+
+  let criterion = '', llmReason = '';
+  if (kind === 'criterion') {
+    const cr = (ts.criteriaResults || [])[idx]; if (!cr) return;
+    criterion = cr.criterion || ''; llmReason = cr.reason || '';
+  } else {
+    const br = (ts.behaviorResults || [])[idx]; if (!br) return;
+    criterion = br.expectation || ''; llmReason = br.reason || '';
+  }
+  const actualResponse = _buildActualResponseText(ts);
+  const conversationTurns = _buildConversationTurns(ts);
+  _acceptCtx = { ucId, testId: selectedTcId, criterion, llmReason, actualResponse, conversationTurns };
+
+  document.getElementById('acc-criterion').textContent = criterion;
+  document.getElementById('acc-reason').textContent    = llmReason || '(no reason given)';
+  document.getElementById('acc-actual').textContent    = actualResponse;
+  document.getElementById('acc-rule').value            = '';
+  document.getElementById('acc-scope-agent').checked   = true;
+  document.getElementById('acc-status').textContent    = '';
+  document.getElementById('acc-modal').classList.remove('hidden');
+
+  // Ask LLM for a suggestion
+  document.getElementById('acc-status').textContent = 'Suggesting rule…';
+  try {
+    const r = await fetch('/api/acceptance-rules/suggest', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ criterion, llm_reason: llmReason, actual_response: actualResponse }),
+    });
+    const j = await r.json();
+    if (j.suggestion) document.getElementById('acc-rule').value = j.suggestion;
+    document.getElementById('acc-status').textContent = j.suggestion ? '' : '(no suggestion — write your own)';
+  } catch (e) {
+    document.getElementById('acc-status').textContent = '(suggestion failed — write your own)';
+  }
+}
+
+function closeAcceptanceModal() {
+  document.getElementById('acc-modal').classList.add('hidden');
+  _acceptCtx = null;
+}
+
+async function saveAcceptanceRule() {
+  if (!_acceptCtx) return;
+  const rule = (document.getElementById('acc-rule').value || '').trim();
+  if (!rule) { document.getElementById('acc-status').textContent = 'Please write a rule.'; return; }
+  const scope = document.getElementById('acc-scope-test').checked ? 'test' : 'agent';
+  document.getElementById('acc-status').textContent = 'Saving…';
+  try {
+    const r = await fetch(`/api/use-cases/${_acceptCtx.ucId}/acceptance-rules`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        human_rule: rule,
+        scope,
+        source: 'playwright',
+        source_test_id: _acceptCtx.testId,
+        criterion: _acceptCtx.criterion,
+        llm_reason: _acceptCtx.llmReason,
+        actual_response: _acceptCtx.actualResponse,
+        conversation_turns: _acceptCtx.conversationTurns || [],
+      }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    closeAcceptanceModal();
+  } catch (e) {
+    document.getElementById('acc-status').textContent = 'Save failed: ' + e.message;
+  }
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 init();
 </script>
+
+<!-- Acceptance Rule Modal ───────────────────────────────────────────────── -->
+<div id="acc-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.5)">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+      <h2 class="text-base font-semibold">Mark verdict as wrong — add acceptance rule</h2>
+      <button onclick="closeAcceptanceModal()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
+    </div>
+    <div class="px-6 py-4 space-y-4">
+      <div>
+        <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Criterion</p>
+        <p id="acc-criterion" class="text-sm text-gray-800"></p>
+      </div>
+      <div>
+        <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">LLM said FAIL because</p>
+        <p id="acc-reason" class="text-sm text-gray-700"></p>
+      </div>
+      <div>
+        <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Bot actually said / showed</p>
+        <pre id="acc-actual" class="text-xs text-gray-700 bg-gray-50 border border-gray-200 rounded p-2 whitespace-pre-wrap max-h-40 overflow-y-auto"></pre>
+      </div>
+      <div>
+        <label class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Acceptance rule (one short sentence — LLM-suggested, editable)</label>
+        <textarea id="acc-rule" rows="3" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="e.g. Carousel cards count as listing items."></textarea>
+        <p id="acc-status" class="text-[11px] text-gray-500 mt-1"></p>
+      </div>
+      <div class="flex items-center gap-4 text-sm">
+        <label class="flex items-center gap-1.5"><input type="radio" name="acc-scope" id="acc-scope-agent" value="agent" checked> Agent-wide</label>
+        <label class="flex items-center gap-1.5"><input type="radio" name="acc-scope" id="acc-scope-test" value="test"> This test only</label>
+      </div>
+    </div>
+    <div class="px-6 py-3 border-t border-gray-200 flex items-center justify-end gap-2">
+      <button onclick="closeAcceptanceModal()" class="px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50">Cancel</button>
+      <button onclick="saveAcceptanceRule()" class="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">Save rule</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
