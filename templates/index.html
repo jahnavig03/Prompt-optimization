@@ -691,6 +691,14 @@ pre { white-space: pre-wrap; word-break: break-word; }
     <button type="button" class="stepper-step" data-step="validate" onclick="goToStep('validate')">
       <span class="stepper-num">3</span> Live validate
     </button>
+    <span class="stepper-arrow" aria-hidden="true">›</span>
+    <button type="button" class="stepper-step" data-step="custom" onclick="goToStep('custom')">
+      <span class="stepper-num">4</span> Custom
+    </button>
+    <span class="stepper-arrow" aria-hidden="true">›</span>
+    <button type="button" class="stepper-step" data-step="reporting" onclick="goToStep('reporting')">
+      <span class="stepper-num">5</span> Reporting
+    </button>
   </nav>
 
   <!-- Sub-navigation: contextual tabs + memory -->
@@ -709,6 +717,12 @@ pre { white-space: pre-wrap; word-break: break-word; }
       </div>
       <div id="subnav-validate" class="subnav-tabs hidden" role="tablist">
         <button class="sub-tab top-tab" id="stab-livetest" onclick="showSideTab('livetest')">Live bot</button>
+      </div>
+      <div id="subnav-custom" class="subnav-tabs hidden" role="tablist">
+        <button class="sub-tab top-tab" id="stab-customtest" onclick="showSideTab('customtest')">Custom test</button>
+      </div>
+      <div id="subnav-reporting" class="subnav-tabs hidden" role="tablist">
+        <button class="sub-tab top-tab" id="stab-reports" onclick="showSideTab('reports')">Reports</button>
       </div>
       <p id="subnav-hint" class="subnav-hint hidden">
         Validate on the <strong>live Yellow.ai bot</strong> (Playwright). Slower, but matches production behavior.
@@ -1126,6 +1140,16 @@ pre { white-space: pre-wrap; word-break: break-word; }
 <!-- ── Live Test full-page pane (replaces the sidebar+main layout when active) ── -->
 <div id="livetest-overlay" class="hidden flex-1 min-h-0">
   <iframe id="livetest-iframe" src="about:blank" style="width:100%;height:100%;border:0;display:block"></iframe>
+</div>
+
+<!-- ── Custom Test full-page pane ── -->
+<div id="customtest-overlay" class="hidden flex-1 min-h-0">
+  <iframe id="customtest-iframe" src="about:blank" style="width:100%;height:100%;border:0;display:block"></iframe>
+</div>
+
+<!-- ── Reporting full-page pane ── -->
+<div id="reports-overlay" class="hidden flex-1 min-h-0">
+  <iframe id="reports-iframe" src="about:blank" style="width:100%;height:100%;border:0;display:block"></iframe>
 </div>
 
 <!-- ══ Progress bar ═════════════════════════════════════════════════════════ -->
@@ -1558,7 +1582,7 @@ async function switchUseCase(id) {
 const LIST_TABS   = ['tests','runs','prompt'];
 const CONFIG_TABS = ['reqs','variables','tools','rules','knowledge','currprompt'];
 const SIDE_TABS   = [...LIST_TABS, ...CONFIG_TABS];
-const TOP_TABS    = [...SIDE_TABS, 'livetest'];
+const TOP_TABS    = [...SIDE_TABS, 'livetest', 'customtest', 'reports'];
 const VERSIONS_SIDEBAR_DEFAULT = '272px';
 const LIST_SIDEBAR_DEFAULT = '420px';
 
@@ -1581,8 +1605,10 @@ const TAB_TO_STEP = {
   reqs: 'setup', variables: 'setup', tools: 'setup', currprompt: 'setup',
   tests: 'testfix', runs: 'testfix', prompt: 'testfix',
   livetest: 'validate',
+  customtest: 'custom',
+  reports: 'reporting',
 };
-const STEP_DEFAULT_TAB = { setup: 'reqs', testfix: 'tests', validate: 'livetest' };
+const STEP_DEFAULT_TAB = { setup: 'reqs', testfix: 'tests', validate: 'livetest', custom: 'customtest', reporting: 'reports' };
 let currentWorkflowStep = 'testfix';
 
 function goToStep(step) {
@@ -1598,7 +1624,7 @@ function updateWorkflowNav(name) {
   });
 
   const isMemory = name === 'rules' || name === 'knowledge';
-  ['setup', 'testfix', 'validate'].forEach(s => {
+  ['setup', 'testfix', 'validate', 'custom', 'reporting'].forEach(s => {
     const el = document.getElementById(`subnav-${s}`);
     if (el) el.classList.toggle('hidden', isMemory || currentWorkflowStep !== s);
   });
@@ -1611,7 +1637,8 @@ function showSideTab(name) {
   currentSideTab = name;
   closeVerDropdown();
   SIDE_TABS.forEach(t => {
-    document.getElementById(`spanel-${t}`).classList.toggle('hidden', t !== name);
+    const el = document.getElementById(`spanel-${t}`);
+    if (el) el.classList.toggle('hidden', t !== name);
   });
   TOP_TABS.forEach(t => {
     const btn = document.getElementById(`stab-${t}`);
@@ -1620,21 +1647,42 @@ function showSideTab(name) {
 
   updateWorkflowNav(name);
 
-  const overlay = document.getElementById('livetest-overlay');
+  const overlay       = document.getElementById('livetest-overlay');
+  const customOverlay = document.getElementById('customtest-overlay');
+  const reportsOverlay = document.getElementById('reports-overlay');
   const layout  = document.getElementById('main-layout');
   const iframe  = document.getElementById('livetest-iframe');
+  const customIframe  = document.getElementById('customtest-iframe');
+  const reportsIframe = document.getElementById('reports-iframe');
   const sidebar = document.getElementById('sidebar');
   const handle  = document.getElementById('sidebar-resize-handle');
   const mainEl  = document.querySelector('main');
 
-  // Live Test = full-page iframe (replaces entire layout)
-  if (name === 'livetest') {
-    if (iframe && iframe.src === 'about:blank') iframe.src = '/live-bot?embedded=1';
-    if (overlay) overlay.classList.remove('hidden');
-    if (layout)  layout.style.display = 'none';
+  // Full-page iframe tabs (replace entire layout)
+  const isFullPage = ['livetest', 'customtest', 'reports'].includes(name);
+  if (isFullPage) {
+    if (name === 'livetest') {
+      if (iframe && iframe.src === 'about:blank') iframe.src = '/live-bot?embedded=1';
+      if (overlay) overlay.classList.remove('hidden');
+    } else if (overlay) overlay.classList.add('hidden');
+
+    if (name === 'customtest') {
+      if (customIframe && customIframe.src === 'about:blank') customIframe.src = '/custom?embedded=1';
+      if (customOverlay) customOverlay.classList.remove('hidden');
+    } else if (customOverlay) customOverlay.classList.add('hidden');
+
+    if (name === 'reports') {
+      if (reportsIframe && reportsIframe.src === 'about:blank') reportsIframe.src = '/reporting?embedded=1';
+      if (reportsOverlay) reportsOverlay.classList.remove('hidden');
+    } else if (reportsOverlay) reportsOverlay.classList.add('hidden');
+
+    if (layout) layout.style.display = 'none';
     return;
   }
+  // Hide all overlays
   if (overlay) overlay.classList.add('hidden');
+  if (customOverlay) customOverlay.classList.add('hidden');
+  if (reportsOverlay) reportsOverlay.classList.add('hidden');
   if (layout)  layout.style.display = '';
 
   // Config tabs = sidebar expands to full width, <main> is hidden
@@ -2071,7 +2119,14 @@ async function startRun(ids, endpoint='run') {
       if (optimizeMode === 'step' && !ev.all_pass) showStepModal(ev);
     }
     if (ev.type === 'paused') { stepRunId = ev.run_id; }
-    if (ev.type === 'done')   { if (currentUcId) reloadPrompt(); if (currentUcId) renderRuns(); finishRun(); }
+    if (ev.type === 'done') {
+      if (ev.stopped) {
+        document.getElementById('progress-text').textContent = 'Run stopped.';
+      }
+      if (currentUcId) reloadPrompt();
+      if (currentUcId) renderRuns();
+      finishRun();
+    }
     if (ev.type === 'error') {
       if (ev.tc_id) {
         const s = testStatus[ev.tc_id] || {status:'done',overall:'ERROR',summary:'',results:[],transcript:[],tool_calls_made:{}};
@@ -2115,14 +2170,18 @@ function updateDot(tcId) {
 }
 
 async function stopRun() {
-  if (!currentRunId) return;
+  const runId = currentRunId || stepRunId;
+  if (!runId) return;
   const btn = document.getElementById('btn-stop');
   if (btn) { btn.disabled = true; btn.textContent = 'Stopping…'; }
   const pt = document.getElementById('progress-text');
   if (pt) pt.textContent = 'Stopping — finishing current step…';
   try {
-    await api(`/api/runs/${currentRunId}/stop`, {method:'POST'});
-  } catch (e) {}
+    await api(`/api/runs/${runId}/stop`, {method:'POST'});
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '■ Stop'; }
+    if (pt) pt.textContent = 'Stop request failed — try again.';
+  }
 }
 
 // ── Step-through modal ────────────────────────────────────────────────────────
@@ -2152,8 +2211,8 @@ async function continueFromStep() {
 
 async function stopFromStep() {
   document.getElementById('step-modal').classList.add('hidden');
-  if (stepRunId) await api(`/api/runs/${stepRunId}/stop`, {method:'POST'});
-  finishRun();
+  const rid = stepRunId || currentRunId;
+  if (rid) await api(`/api/runs/${rid}/stop`, {method:'POST'});
 }
 
 // ── Requirements ──────────────────────────────────────────────────────────────

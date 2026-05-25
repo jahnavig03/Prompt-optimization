@@ -1,5 +1,6 @@
 """report_pdf.py — Generate a structured PDF report for a Playwright test run."""
 
+import inspect
 import io
 import json
 from datetime import datetime
@@ -7,6 +8,36 @@ from datetime import datetime
 from fpdf import FPDF
 
 import db
+
+
+def _apply_fpdf_compat() -> None:
+    """Support fpdf 1.x when fpdf2 is not installed (requirements specify fpdf2)."""
+    if "new_x" in inspect.signature(FPDF.cell).parameters:
+        return
+
+    _orig_cell = FPDF.cell
+    _orig_multi = FPDF.multi_cell
+    _orig_rect = FPDF.rect
+
+    def _cell(self, w, h, txt="", border=0, ln=0, align="", fill=False, link="",
+              new_x=None, new_y=None, **kwargs):
+        if new_y == "NEXT":
+            ln = 1
+        return _orig_cell(self, w, h, txt, border, ln, align, fill, link)
+
+    def _multi_cell(self, w, h, txt="", border=0, align="J", fill=False,
+                    split_only=False, new_x=None, new_y=None, **kwargs):
+        return _orig_multi(self, w, h, txt, border, align, fill, split_only)
+
+    def _rect(self, x, y, w, h, style="", round_corners=False, corner_radius=0, **kwargs):
+        return _orig_rect(self, x, y, w, h, style)
+
+    FPDF.cell = _cell
+    FPDF.multi_cell = _multi_cell
+    FPDF.rect = _rect
+
+
+_apply_fpdf_compat()
 
 # ── Color palette ────────────────────────────────────────────────────────────
 WHITE      = (255, 255, 255)
@@ -39,7 +70,9 @@ class ReportPDF(FPDF):
             return
         self.set_font('Helvetica', 'I', 8)
         self.set_text_color(*GRAY_400)
-        self.cell(0, 6, f'Run #{self.run["id"]} Report', align='L')
+        agent = _get_agent_name(self.run, self.results)
+        header_text = f'{agent} Report' if agent else f'Run #{self.run["id"]} Report'
+        self.cell(0, 6, header_text, align='L')
         self.cell(0, 6, f'Page {self.page_no()}', align='R', new_x='LMARGIN', new_y='NEXT')
         self.set_draw_color(*GRAY_200)
         self.line(10, self.get_y(), 200, self.get_y())
@@ -55,6 +88,13 @@ class ReportPDF(FPDF):
     def _rounded_rect_fill(self, x, y, w, h, r, color):
         self.set_fill_color(*color)
         self.rect(x, y, w, h, style='F', round_corners=True, corner_radius=r)
+
+    def circle(self, x, y, r, style=''):
+        if hasattr(super(), 'circle'):
+            super().circle(x, y, r, style=style)
+            return
+        fill = 'F' if 'F' in style else 'D'
+        self.rect(x - r / 2, y - r / 2, r, r, style=fill)
 
     def _safe_text(self, txt):
         if not txt:
@@ -77,45 +117,64 @@ def generate_report(run_id: int) -> bytes:
     _draw_test_cases(pdf, results)
     _draw_summary(pdf, run, results)
 
+    if "dest" in inspect.signature(pdf.output).parameters:
+        return pdf.output(dest="S").encode("latin-1")
+
     buf = io.BytesIO()
     pdf.output(buf)
     return buf.getvalue()
 
 
+def _get_agent_name(run, results):
+    """Extract the primary agent name from results or run data."""
+    agents = {}
+    for r in results:
+        name = r.get('use_case_name', '')
+        if name:
+            agents[name] = agents.get(name, 0) + 1
+    if agents:
+        return max(agents, key=agents.get)
+    return run.get('use_case_name', '')
+
+
 def _draw_cover(pdf: ReportPDF, run, results):
-    pdf.set_y(20)
+    pdf.set_y(30)
 
-    pdf.set_font('Helvetica', 'B', 22)
+    pdf.set_font('Helvetica', 'B', 24)
     pdf.set_text_color(*BRAND)
-    pdf.cell(0, 12, pdf._safe_text('Live Bot Test Report'), align='C', new_x='LMARGIN', new_y='NEXT')
+    pdf.cell(0, 14, pdf._safe_text('Live Bot Test Report'), align='C', new_x='LMARGIN', new_y='NEXT')
 
-    pdf.set_font('Helvetica', '', 10)
-    pdf.set_text_color(*GRAY_500)
-    pdf.cell(0, 7, pdf._safe_text(f'Run #{run["id"]}'), align='C', new_x='LMARGIN', new_y='NEXT')
+    # Agent name subtitle
+    agent_name = _get_agent_name(run, results)
+    if agent_name:
+        pdf.set_font('Helvetica', '', 11)
+        pdf.set_text_color(*GRAY_500)
+        pdf.cell(0, 7, pdf._safe_text(agent_name), align='C', new_x='LMARGIN', new_y='NEXT')
 
-    pdf.ln(6)
+    pdf.ln(8)
     pdf.set_draw_color(*GRAY_200)
-    pdf.line(60, pdf.get_y(), 150, pdf.get_y())
-    pdf.ln(6)
+    pdf.line(50, pdf.get_y(), 160, pdf.get_y())
+    pdf.ln(8)
 
     info_items = [
         ('Bot ID', run.get('bot_id', '—')),
-        ('Mode', run.get('mode', '—')),
         ('Started', _fmt_dt(run.get('started_at', ''))),
         ('Ended', _fmt_dt(run.get('ended_at', ''))),
         ('Status', run.get('status', '—').upper()),
     ]
+    if agent_name:
+        info_items.append(('Agent', agent_name))
 
     pdf.set_font('Helvetica', '', 9)
     for label, value in info_items:
         pdf.set_text_color(*GRAY_500)
-        pdf.cell(40, 6, pdf._safe_text(f'{label}:'), align='R')
+        pdf.cell(45, 7, pdf._safe_text(f'{label}:'), align='R')
         pdf.set_text_color(*TEXT_DARK)
         pdf.set_font('Helvetica', 'B', 9)
-        pdf.cell(0, 6, pdf._safe_text(f'  {value}'), align='L', new_x='LMARGIN', new_y='NEXT')
+        pdf.cell(0, 7, pdf._safe_text(f'  {value}'), align='L', new_x='LMARGIN', new_y='NEXT')
         pdf.set_font('Helvetica', '', 9)
 
-    pdf.ln(6)
+    pdf.ln(8)
 
 
 def _draw_metrics(pdf: ReportPDF, run, results):
@@ -132,9 +191,9 @@ def _draw_metrics(pdf: ReportPDF, run, results):
     pdf.cell(0, 8, 'Test Results Overview', new_x='LMARGIN', new_y='NEXT')
     pdf.ln(2)
 
-    card_w = 43
-    card_h = 28
-    gap    = 4
+    card_w = 44
+    card_h = 32
+    gap    = 3
     x0     = 12
 
     cards = [
@@ -148,27 +207,29 @@ def _draw_metrics(pdf: ReportPDF, run, results):
     for i, (label, value, color, bg) in enumerate(cards):
         cx = x0 + i * (card_w + gap)
         pdf._rounded_rect_fill(cx, cy, card_w, card_h, 3, bg)
-        pdf.set_xy(cx, cy + 4)
+        # Label at the top
+        pdf.set_xy(cx, cy + 3)
         pdf.set_font('Helvetica', '', 8)
         pdf.set_text_color(*GRAY_500)
         pdf.cell(card_w, 5, pdf._safe_text(label), align='C')
-        pdf.set_xy(cx, cy + 11)
-        pdf.set_font('Helvetica', 'B', 16)
+        # Large number below
+        pdf.set_xy(cx, cy + 13)
+        pdf.set_font('Helvetica', 'B', 18)
         pdf.set_text_color(*color)
-        pdf.cell(card_w, 10, pdf._safe_text(value), align='C')
+        pdf.cell(card_w, 12, pdf._safe_text(value), align='C')
 
     if errors > 0:
         cx = x0 + 4 * (card_w + gap)
         if cx + card_w <= 200:
             pdf._rounded_rect_fill(cx, cy, card_w, card_h, 3, WARNING_BG)
-            pdf.set_xy(cx, cy + 4)
+            pdf.set_xy(cx, cy + 3)
             pdf.set_font('Helvetica', '', 8)
             pdf.set_text_color(*GRAY_500)
             pdf.cell(card_w, 5, 'Errors', align='C')
-            pdf.set_xy(cx, cy + 11)
-            pdf.set_font('Helvetica', 'B', 16)
+            pdf.set_xy(cx, cy + 13)
+            pdf.set_font('Helvetica', 'B', 18)
             pdf.set_text_color(*WARNING)
-            pdf.cell(card_w, 10, str(errors), align='C')
+            pdf.cell(card_w, 12, str(errors), align='C')
 
     pdf.set_y(cy + card_h + 8)
 
@@ -248,7 +309,7 @@ def _draw_test_cases(pdf: ReportPDF, results):
 
 
 def _draw_one_test(pdf: ReportPDF, result, num):
-    if pdf.get_y() > 240:
+    if pdf.get_y() > 230:
         pdf.add_page()
 
     overall = result['overall']
@@ -256,39 +317,49 @@ def _draw_one_test(pdf: ReportPDF, result, num):
     border_color = SUCCESS if is_pass else ERROR if overall == 'FAIL' else WARNING
     bg_color = SUCCESS_BG if is_pass else ERROR_BG if overall == 'FAIL' else WARNING_BG
 
-    # Test header card
+    # --- Test header card with border ---
     y0 = pdf.get_y()
-    pdf._rounded_rect_fill(10, y0, 190, 14, 3, bg_color)
-    pdf.set_xy(14, y0 + 2)
-
-    # Status indicator
+    # Draw bordered card background
+    pdf._rounded_rect_fill(12, y0, 186, 18, 3, WHITE)
+    pdf.set_draw_color(*GRAY_200)
+    pdf.rect(12, y0, 186, 18, style='D')
+    # Left accent border
     pdf.set_fill_color(*border_color)
-    pdf.circle(16, y0 + 7, 2.5, style='F')
+    pdf.rect(12, y0, 2, 18, style='F')
 
-    pdf.set_xy(22, y0 + 2)
+    # Test ID + Name
+    pdf.set_xy(18, y0 + 2)
     pdf.set_font('Helvetica', 'B', 10)
     pdf.set_text_color(*TEXT_DARK)
-    pdf.cell(120, 5, pdf._safe_text(f'{result.get("test_id", f"PT-{num:03d}")} — {result.get("name", "")}'))
+    test_id = result.get("test_id", f"PT-{num:03d}")
+    test_name = result.get("name", "")
+    pdf.cell(140, 6, pdf._safe_text(f'{test_id}   {test_name}'))
 
-    pdf.set_xy(160, y0 + 2)
-    pdf.set_font('Helvetica', 'B', 10)
+    # PASS/FAIL badge
+    badge_text = overall
+    badge_w = pdf.get_string_width(badge_text) + 8
+    badge_x = 198 - badge_w - 4
+    pdf.set_xy(badge_x, y0 + 2)
+    pdf._rounded_rect_fill(badge_x, y0 + 2, badge_w, 7, 2, bg_color)
+    pdf.set_font('Helvetica', 'B', 9)
     pdf.set_text_color(*border_color)
-    pdf.cell(36, 5, overall, align='R')
+    pdf.cell(badge_w, 7, badge_text, align='C')
 
-    # Agent name
-    pdf.set_xy(22, y0 + 8)
-    pdf.set_font('Helvetica', 'I', 7.5)
-    pdf.set_text_color(*GRAY_500)
-    pdf.cell(0, 4, pdf._safe_text(f'Agent: {result.get("use_case_name", "—")}'))
+    # Agent name in green
+    pdf.set_xy(18, y0 + 10)
+    pdf.set_font('Helvetica', '', 8)
+    pdf.set_text_color(*SUCCESS)
+    pdf.cell(0, 5, pdf._safe_text(f'Agent: {result.get("use_case_name", "—")}'))
 
-    pdf.set_y(y0 + 16)
+    pdf.set_y(y0 + 22)
 
-    # Summary
+    # Judge summary
     summary = result.get('summary', '')
     if summary:
-        pdf.set_font('Helvetica', 'I', 8)
+        pdf.set_x(14)
+        pdf.set_font('Helvetica', '', 8.5)
         pdf.set_text_color(*GRAY_700)
-        pdf.multi_cell(186, 4.5, pdf._safe_text(f'Judge: {summary}'), new_x='LMARGIN', new_y='NEXT')
+        pdf.multi_cell(182, 4.5, pdf._safe_text(f'Judge: {summary}'), new_x='LMARGIN', new_y='NEXT')
         pdf.ln(2)
 
     # Conversation turns
@@ -302,58 +373,59 @@ def _draw_one_test(pdf: ReportPDF, result, num):
         for t in turns:
             _draw_turn(pdf, t)
 
-    pdf.ln(4)
+    pdf.ln(6)
     pdf.set_draw_color(*GRAY_200)
-    pdf.dashed_line(10, pdf.get_y(), 200, pdf.get_y(), dash_length=2, space_length=2)
-    pdf.ln(5)
+    pdf.line(12, pdf.get_y(), 198, pdf.get_y())
+    pdf.ln(6)
 
 
 def _draw_turn(pdf: ReportPDF, turn):
-    if pdf.get_y() > 260:
+    if pdf.get_y() > 255:
         pdf.add_page()
 
     turn_num = turn.get('turn', '?')
 
-    # User message
+    # User message — full-width colored bar header
     uy = pdf.get_y()
-    pdf._rounded_rect_fill(14, uy, 90, 5, 1.5, BRAND_LIGHT)
+    pdf._rounded_rect_fill(14, uy, 182, 6, 1, BRAND_LIGHT)
     pdf.set_xy(16, uy + 0.5)
-    pdf.set_font('Helvetica', 'B', 7)
+    pdf.set_font('Helvetica', 'B', 8)
     pdf.set_text_color(*BRAND)
-    pdf.cell(0, 4, pdf._safe_text(f'Turn {turn_num} - User'))
-    pdf.set_y(uy + 6)
+    pdf.cell(0, 5, pdf._safe_text(f'Turn {turn_num} - User'))
+    pdf.set_y(uy + 7)
 
-    pdf.set_x(16)
-    pdf.set_font('Helvetica', '', 8.5)
+    # User text (bold)
+    pdf.set_x(14)
+    pdf.set_font('Helvetica', 'B', 8.5)
     pdf.set_text_color(*TEXT_DARK)
     user_text = turn.get('user', '') or '(empty)'
-    pdf.multi_cell(178, 4.5, pdf._safe_text(user_text), new_x='LMARGIN', new_y='NEXT')
-    pdf.ln(1.5)
+    pdf.multi_cell(182, 4.5, pdf._safe_text(user_text), new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(1)
 
     # Expected (if present)
     expected = turn.get('expected', '')
     if expected:
-        pdf.set_x(16)
-        pdf.set_font('Helvetica', 'I', 7.5)
+        pdf.set_x(14)
+        pdf.set_font('Helvetica', '', 7.5)
         pdf.set_text_color(*GRAY_500)
-        pdf.multi_cell(178, 4, pdf._safe_text(f'Expected: {expected}'), new_x='LMARGIN', new_y='NEXT')
+        pdf.multi_cell(182, 4, pdf._safe_text(f'Expected: {expected}'), new_x='LMARGIN', new_y='NEXT')
         pdf.ln(1)
 
-    # Bot response
+    # Bot response — full-width colored bar header
     by = pdf.get_y()
-    pdf._rounded_rect_fill(14, by, 90, 5, 1.5, SUCCESS_BG)
+    pdf._rounded_rect_fill(14, by, 182, 6, 1, SUCCESS_BG)
     pdf.set_xy(16, by + 0.5)
-    pdf.set_font('Helvetica', 'B', 7)
+    pdf.set_font('Helvetica', 'B', 8)
     pdf.set_text_color(*SUCCESS)
-    pdf.cell(0, 4, 'Bot')
-    pdf.set_y(by + 6)
+    pdf.cell(0, 5, 'Bot')
+    pdf.set_y(by + 7)
 
-    pdf.set_x(16)
+    pdf.set_x(14)
     pdf.set_font('Helvetica', '', 8.5)
     pdf.set_text_color(*TEXT_DARK)
     actual = turn.get('actual', '') or '(no response captured)'
-    pdf.multi_cell(178, 4.5, pdf._safe_text(actual), new_x='LMARGIN', new_y='NEXT')
-    pdf.ln(2.5)
+    pdf.multi_cell(182, 4.5, pdf._safe_text(actual), new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(3)
 
 
 def _draw_summary(pdf: ReportPDF, run, results):
@@ -369,18 +441,19 @@ def _draw_summary(pdf: ReportPDF, run, results):
     failed = sum(1 for r in results if r['overall'] == 'FAIL')
     errors = total - passed - failed
     pct    = round(passed / total * 100, 1) if total else 0
+    agent_name = _get_agent_name(run, results)
 
-    # Summary box
+    # Summary verdict box
     box_y = pdf.get_y()
     box_color = SUCCESS_BG if pct == 100 else ERROR_BG if pct < 50 else WARNING_BG
-    pdf._rounded_rect_fill(10, box_y, 190, 22, 3, box_color)
+    pdf._rounded_rect_fill(10, box_y, 190, 26, 3, box_color)
 
     pdf.set_xy(16, box_y + 4)
     pdf.set_font('Helvetica', 'B', 14)
     result_color = SUCCESS if pct == 100 else ERROR if pct < 50 else WARNING
     pdf.set_text_color(*result_color)
     if pct == 100:
-        verdict = 'ALL TESTS PASSED'
+        verdict = f'ALL TESTS PASSED — {passed}/{total} passed ({pct}%)'
     elif pct >= 50:
         verdict = f'{passed}/{total} TESTS PASSED ({pct}%)'
     else:
@@ -391,34 +464,43 @@ def _draw_summary(pdf: ReportPDF, run, results):
     pdf.set_font('Helvetica', '', 8)
     pdf.set_text_color(*GRAY_700)
     duration = _calc_duration(run.get('started_at', ''), run.get('ended_at', ''))
-    pdf.cell(0, 5, pdf._safe_text(f'Completed in {duration} | Mode: {run.get("mode", "—")} | Bot: {run.get("bot_id", "—")}'))
+    scope_parts = []
+    if agent_name:
+        scope_parts.append(f'Scope: {agent_name} agent use cases')
+    scope_parts.append(f'Bot: {run.get("bot_id", "-")}')
+    if duration != '-':
+        scope_parts.append(f'Duration: {duration}')
+    pdf.cell(0, 5, pdf._safe_text(' | '.join(scope_parts)))
 
-    pdf.set_y(box_y + 28)
+    pdf.set_y(box_y + 30)
 
     # Detailed breakdown table
-    pdf.set_font('Helvetica', 'B', 9)
+    pdf.ln(2)
+    pdf.set_font('Helvetica', 'B', 11)
     pdf.set_text_color(*TEXT_DARK)
-    pdf.cell(0, 7, 'Detailed Results', new_x='LMARGIN', new_y='NEXT')
-    pdf.ln(1)
+    pdf.cell(0, 8, 'Detailed Results', new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(2)
 
     # Table header
     pdf.set_font('Helvetica', 'B', 8)
     pdf.set_text_color(*GRAY_500)
     pdf.set_fill_color(*GRAY_100)
     pdf.cell(22, 6, '  ID', fill=True)
-    pdf.cell(80, 6, 'Test Name', fill=True)
+    pdf.cell(80, 6, 'Use Case', fill=True)
     pdf.cell(44, 6, 'Agent', fill=True)
     pdf.cell(20, 6, 'Result', align='C', fill=True)
     pdf.cell(24, 6, 'Turns', align='C', fill=True, new_x='LMARGIN', new_y='NEXT')
 
     pdf.set_font('Helvetica', '', 8)
     for r in results:
+        if pdf.get_y() > 270:
+            pdf.add_page()
         is_pass = r['overall'] == 'PASS'
         pdf.set_text_color(*TEXT_DARK)
         pdf.cell(22, 5.5, pdf._safe_text(f'  {r.get("test_id", "?")}'))
         pdf.cell(80, 5.5, pdf._safe_text(r.get('name', '')[:42]))
         pdf.set_text_color(*GRAY_500)
-        pdf.cell(44, 5.5, pdf._safe_text(r.get('use_case_name', '—')[:22]))
+        pdf.cell(44, 5.5, pdf._safe_text(r.get('use_case_name', '-')[:22]))
         color = SUCCESS if is_pass else ERROR if r['overall'] == 'FAIL' else WARNING
         pdf.set_text_color(*color)
         pdf.set_font('Helvetica', 'B', 8)
@@ -427,31 +509,84 @@ def _draw_summary(pdf: ReportPDF, run, results):
         pdf.set_text_color(*TEXT_DARK)
         pdf.cell(24, 5.5, str(len(r.get('turns', []))), align='C', new_x='LMARGIN', new_y='NEXT')
 
-        # Separator line
         pdf.set_draw_color(*GRAY_200)
         pdf.line(10, pdf.get_y(), 200, pdf.get_y())
 
     pdf.ln(8)
 
+    # Passed tests section
+    passed_results = [r for r in results if r['overall'] == 'PASS']
+    if passed_results:
+        if pdf.get_y() > 220:
+            pdf.add_page()
+
+        # Count unique use cases
+        unique_uc = set(r.get('use_case_name', '-') for r in passed_results)
+        pdf.set_font('Helvetica', 'B', 11)
+        pdf.set_text_color(*SUCCESS)
+        pdf.cell(0, 8, pdf._safe_text(
+            f'Passed Tests ({len(passed_results)} use cases across {len(unique_uc)} grouped checks)'),
+            new_x='LMARGIN', new_y='NEXT')
+        pdf.ln(2)
+
+        for r in passed_results:
+            if pdf.get_y() > 265:
+                pdf.add_page()
+            pdf.set_font('Helvetica', 'B', 8.5)
+            pdf.set_text_color(*TEXT_DARK)
+            pdf.cell(0, 5.5, pdf._safe_text(
+                f'{r.get("test_id", "?")} {r.get("name", "")}'),
+                new_x='LMARGIN', new_y='NEXT')
+            if r.get('summary'):
+                pdf.set_font('Helvetica', '', 7.5)
+                pdf.set_text_color(*GRAY_500)
+                pdf.multi_cell(186, 4, pdf._safe_text(r['summary']), new_x='LMARGIN', new_y='NEXT')
+            pdf.ln(2)
+
+    pdf.ln(2)
+
     # Failed tests detail
     failed_results = [r for r in results if r['overall'] != 'PASS']
     if failed_results:
-        pdf.set_font('Helvetica', 'B', 9)
+        if pdf.get_y() > 220:
+            pdf.add_page()
+
+        pdf.set_font('Helvetica', 'B', 11)
         pdf.set_text_color(*ERROR)
-        pdf.cell(0, 7, pdf._safe_text(f'Failed / Error Tests ({len(failed_results)})'), new_x='LMARGIN', new_y='NEXT')
-        pdf.ln(1)
+        pdf.cell(0, 8, pdf._safe_text(f'Failed / Error Tests ({len(failed_results)})'), new_x='LMARGIN', new_y='NEXT')
+        pdf.ln(2)
 
         for r in failed_results:
-            if pdf.get_y() > 260:
+            if pdf.get_y() > 255:
                 pdf.add_page()
-            pdf.set_font('Helvetica', 'B', 8)
-            pdf.set_text_color(*TEXT_DARK)
-            pdf.cell(0, 5, pdf._safe_text(f'{r.get("test_id", "?")} — {r.get("name", "")}'), new_x='LMARGIN', new_y='NEXT')
+            # Bordered card for failed tests
+            card_y = pdf.get_y()
+            pdf.set_x(12)
+            pdf.set_font('Helvetica', 'B', 9)
+            pdf.set_text_color(*ERROR)
+            pdf.cell(0, 6, pdf._safe_text(f'{r.get("test_id", "?")} — {r.get("name", "")}'),
+                     new_x='LMARGIN', new_y='NEXT')
             if r.get('summary'):
-                pdf.set_font('Helvetica', 'I', 7.5)
+                pdf.set_x(12)
+                pdf.set_font('Helvetica', '', 8)
                 pdf.set_text_color(*GRAY_700)
-                pdf.multi_cell(186, 4, pdf._safe_text(f'  {r["summary"]}'), new_x='LMARGIN', new_y='NEXT')
-            pdf.ln(2)
+                pdf.multi_cell(184, 4.5, pdf._safe_text(r['summary']), new_x='LMARGIN', new_y='NEXT')
+            card_end = pdf.get_y() + 2
+            # Draw border around failed card
+            pdf.set_draw_color(*ERROR_BG[0], ERROR_BG[1], ERROR_BG[2])
+            pdf._rounded_rect_fill(10, card_y - 2, 190, card_end - card_y + 4, 3, ERROR_BG)
+            # Re-draw text on top of background
+            pdf.set_xy(14, card_y)
+            pdf.set_font('Helvetica', 'B', 9)
+            pdf.set_text_color(*ERROR)
+            pdf.cell(0, 6, pdf._safe_text(f'{r.get("test_id", "?")} — {r.get("name", "")}'),
+                     new_x='LMARGIN', new_y='NEXT')
+            if r.get('summary'):
+                pdf.set_x(14)
+                pdf.set_font('Helvetica', '', 8)
+                pdf.set_text_color(*GRAY_700)
+                pdf.multi_cell(182, 4.5, pdf._safe_text(r['summary']), new_x='LMARGIN', new_y='NEXT')
+            pdf.ln(4)
 
     # Footer note
     pdf.ln(6)
@@ -506,3 +641,275 @@ def _pct_bg(pct):
     if pct >= 50:
         return WARNING_BG
     return ERROR_BG
+
+
+def _draw_summary_consolidated(pdf, all_run_data, all_results):
+    """Draw summary section for consolidated (multi-run) reports."""
+    pdf.add_page()
+
+    pdf.set_font('Helvetica', 'B', 13)
+    pdf.set_text_color(*TEXT_DARK)
+    pdf.cell(0, 10, 'Consolidated Summary', new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(2)
+
+    total  = len(all_results)
+    passed = sum(1 for r in all_results if r.get('overall') == 'PASS')
+    failed = sum(1 for r in all_results if r.get('overall') == 'FAIL')
+    pct    = round(passed / total * 100, 1) if total else 0
+
+    box_y = pdf.get_y()
+    box_color = SUCCESS_BG if pct == 100 else ERROR_BG if pct < 50 else WARNING_BG
+    pdf._rounded_rect_fill(10, box_y, 190, 26, 3, box_color)
+
+    pdf.set_xy(16, box_y + 4)
+    pdf.set_font('Helvetica', 'B', 14)
+    result_color = SUCCESS if pct == 100 else ERROR if pct < 50 else WARNING
+    pdf.set_text_color(*result_color)
+    if pct == 100:
+        verdict = f'ALL TESTS PASSED — {passed}/{total} passed ({pct}%)'
+    elif pct >= 50:
+        verdict = f'{passed}/{total} TESTS PASSED ({pct}%)'
+    else:
+        verdict = f'MOST TESTS FAILED — {passed}/{total} passed ({pct}%)'
+    pdf.cell(0, 7, pdf._safe_text(verdict))
+
+    pdf.set_xy(16, box_y + 13)
+    pdf.set_font('Helvetica', '', 8)
+    pdf.set_text_color(*GRAY_700)
+    pdf.cell(0, 5, pdf._safe_text(f'{len(all_run_data)} runs consolidated | {total} total tests'))
+
+    pdf.set_y(box_y + 30)
+
+    # Detailed table
+    pdf.set_font('Helvetica', 'B', 11)
+    pdf.set_text_color(*TEXT_DARK)
+    pdf.cell(0, 8, 'Detailed Results', new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(2)
+
+    pdf.set_font('Helvetica', 'B', 8)
+    pdf.set_text_color(*GRAY_500)
+    pdf.set_fill_color(*GRAY_100)
+    pdf.cell(22, 6, '  ID', fill=True)
+    pdf.cell(80, 6, 'Use Case', fill=True)
+    pdf.cell(44, 6, 'Agent', fill=True)
+    pdf.cell(20, 6, 'Result', align='C', fill=True)
+    pdf.cell(24, 6, 'Turns', align='C', fill=True, new_x='LMARGIN', new_y='NEXT')
+
+    pdf.set_font('Helvetica', '', 8)
+    for r in all_results:
+        if pdf.get_y() > 270:
+            pdf.add_page()
+        is_pass = r.get('overall') == 'PASS'
+        pdf.set_text_color(*TEXT_DARK)
+        pdf.cell(22, 5.5, pdf._safe_text(f'  {r.get("test_id", "?")}'))
+        pdf.cell(80, 5.5, pdf._safe_text(r.get('name', '')[:42]))
+        pdf.set_text_color(*GRAY_500)
+        pdf.cell(44, 5.5, pdf._safe_text(r.get('use_case_name', '-')[:22]))
+        color = SUCCESS if is_pass else ERROR if r.get('overall') == 'FAIL' else WARNING
+        pdf.set_text_color(*color)
+        pdf.set_font('Helvetica', 'B', 8)
+        pdf.cell(20, 5.5, r.get('overall', 'pending'), align='C')
+        pdf.set_font('Helvetica', '', 8)
+        pdf.set_text_color(*TEXT_DARK)
+        pdf.cell(24, 5.5, str(len(r.get('turns', []))), align='C', new_x='LMARGIN', new_y='NEXT')
+        pdf.set_draw_color(*GRAY_200)
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+
+    pdf.ln(8)
+
+    # Passed tests listing
+    passed_results = [r for r in all_results if r.get('overall') == 'PASS']
+    if passed_results:
+        if pdf.get_y() > 220:
+            pdf.add_page()
+        unique_uc = set(r.get('use_case_name', '-') for r in passed_results)
+        pdf.set_font('Helvetica', 'B', 11)
+        pdf.set_text_color(*SUCCESS)
+        pdf.cell(0, 8, pdf._safe_text(
+            f'Passed Tests ({len(passed_results)} use cases across {len(unique_uc)} grouped checks)'),
+            new_x='LMARGIN', new_y='NEXT')
+        pdf.ln(2)
+
+        for r in passed_results:
+            if pdf.get_y() > 265:
+                pdf.add_page()
+            pdf.set_font('Helvetica', 'B', 8.5)
+            pdf.set_text_color(*TEXT_DARK)
+            pdf.cell(0, 5.5, pdf._safe_text(f'{r.get("test_id", "?")} {r.get("name", "")}'),
+                     new_x='LMARGIN', new_y='NEXT')
+            if r.get('summary'):
+                pdf.set_font('Helvetica', '', 7.5)
+                pdf.set_text_color(*GRAY_500)
+                pdf.multi_cell(186, 4, pdf._safe_text(r['summary']), new_x='LMARGIN', new_y='NEXT')
+            pdf.ln(2)
+
+    pdf.ln(2)
+
+    # Failed tests
+    failed_results = [r for r in all_results if r.get('overall') != 'PASS']
+    if failed_results:
+        if pdf.get_y() > 220:
+            pdf.add_page()
+        pdf.set_font('Helvetica', 'B', 11)
+        pdf.set_text_color(*ERROR)
+        pdf.cell(0, 8, pdf._safe_text(f'Failed / Error Tests ({len(failed_results)})'), new_x='LMARGIN', new_y='NEXT')
+        pdf.ln(2)
+
+        for r in failed_results:
+            if pdf.get_y() > 255:
+                pdf.add_page()
+            card_y = pdf.get_y()
+            pdf.set_x(12)
+            pdf.set_font('Helvetica', 'B', 9)
+            pdf.set_text_color(*ERROR)
+            pdf.cell(0, 6, pdf._safe_text(f'{r.get("test_id", "?")} — {r.get("name", "")}'),
+                     new_x='LMARGIN', new_y='NEXT')
+            if r.get('summary'):
+                pdf.set_x(12)
+                pdf.set_font('Helvetica', '', 8)
+                pdf.set_text_color(*GRAY_700)
+                pdf.multi_cell(184, 4.5, pdf._safe_text(r['summary']), new_x='LMARGIN', new_y='NEXT')
+            card_end = pdf.get_y() + 2
+            pdf._rounded_rect_fill(10, card_y - 2, 190, card_end - card_y + 4, 3, ERROR_BG)
+            pdf.set_xy(14, card_y)
+            pdf.set_font('Helvetica', 'B', 9)
+            pdf.set_text_color(*ERROR)
+            pdf.cell(0, 6, pdf._safe_text(f'{r.get("test_id", "?")} — {r.get("name", "")}'),
+                     new_x='LMARGIN', new_y='NEXT')
+            if r.get('summary'):
+                pdf.set_x(14)
+                pdf.set_font('Helvetica', '', 8)
+                pdf.set_text_color(*GRAY_700)
+                pdf.multi_cell(182, 4.5, pdf._safe_text(r['summary']), new_x='LMARGIN', new_y='NEXT')
+            pdf.ln(4)
+
+    # Footer
+    pdf.ln(6)
+    pdf.set_draw_color(*GRAY_200)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(4)
+    pdf.set_font('Helvetica', 'I', 7.5)
+    pdf.set_text_color(*GRAY_400)
+    pdf.cell(0, 5, pdf._safe_text(
+        f'Report generated on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} by Prompt Optimization Lab'),
+        align='C')
+
+
+# ── Consolidated report (multiple runs) ─────────────────────────────────────
+
+def generate_consolidated_report(run_selections: list[dict]) -> bytes:
+    """Generate a consolidated PDF report for multiple runs.
+
+    run_selections: list of dicts with keys:
+      - source: "live_validate" | "custom"
+      - run_id: int
+    """
+    all_run_data = []
+    for sel in run_selections:
+        source = sel.get("source", "live_validate")
+        run_id = sel.get("run_id")
+        if source == "custom":
+            run = db.get_custom_run(run_id) if hasattr(db, 'get_custom_run') else None
+            results = db.get_custom_results(run_id) if run else []
+        else:
+            run = db.get_playwright_run(run_id)
+            results = db.get_playwright_results(run_id) if run else []
+        if run:
+            run["_source"] = source
+            all_run_data.append((run, results))
+
+    if not all_run_data:
+        raise ValueError("No valid runs found for the selected IDs.")
+
+    # If single run, use existing report format
+    if len(all_run_data) == 1:
+        run, results = all_run_data[0]
+        pdf = ReportPDF(run, results)
+        pdf.alias_nb_pages()
+        pdf.add_page()
+        _draw_cover(pdf, run, results)
+        _draw_metrics(pdf, run, results)
+        _draw_test_cases(pdf, results)
+        _draw_summary(pdf, run, results)
+        if "dest" in inspect.signature(pdf.output).parameters:
+            return pdf.output(dest="S").encode("latin-1")
+        buf = io.BytesIO()
+        pdf.output(buf)
+        return buf.getvalue()
+
+    # Multi-run consolidated report
+    all_results = []
+    for _, results in all_run_data:
+        all_results.extend(results)
+
+    # Use first run as the "main" run for the PDF class
+    main_run = all_run_data[0][0]
+    pdf = ReportPDF(main_run, all_results)
+    pdf.alias_nb_pages()
+    pdf.add_page()
+
+    # Consolidated cover
+    pdf.set_y(20)
+    pdf.set_font('Helvetica', 'B', 22)
+    pdf.set_text_color(*BRAND)
+    pdf.cell(0, 12, pdf._safe_text('Consolidated Test Report'), align='C', new_x='LMARGIN', new_y='NEXT')
+
+    pdf.set_font('Helvetica', '', 10)
+    pdf.set_text_color(*GRAY_500)
+    pdf.cell(0, 7, pdf._safe_text(f'{len(all_run_data)} runs | {len(all_results)} total tests'),
+             align='C', new_x='LMARGIN', new_y='NEXT')
+
+    pdf.ln(4)
+    pdf.set_draw_color(*GRAY_200)
+    pdf.line(60, pdf.get_y(), 150, pdf.get_y())
+    pdf.ln(4)
+
+    # Info about included runs
+    pdf.set_font('Helvetica', 'B', 9)
+    pdf.set_text_color(*TEXT_DARK)
+    pdf.cell(0, 7, 'Included Runs', new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(1)
+
+    pdf.set_font('Helvetica', 'B', 8)
+    pdf.set_text_color(*GRAY_500)
+    pdf.set_fill_color(*GRAY_100)
+    pdf.cell(20, 6, '  Run', fill=True)
+    pdf.cell(30, 6, 'Source', fill=True)
+    pdf.cell(50, 6, 'Bot', fill=True)
+    pdf.cell(30, 6, 'Tests', align='C', fill=True)
+    pdf.cell(30, 6, 'Status', align='C', fill=True)
+    pdf.cell(30, 6, 'Date', align='C', fill=True, new_x='LMARGIN', new_y='NEXT')
+
+    pdf.set_font('Helvetica', '', 8)
+    for run, results in all_run_data:
+        pdf.set_text_color(*TEXT_DARK)
+        pdf.cell(20, 5.5, pdf._safe_text(f'  #{run.get("id", "?")}'))
+        source_label = 'Live' if run.get("_source") == "live_validate" else 'Custom'
+        pdf.cell(30, 5.5, source_label)
+        pdf.cell(50, 5.5, pdf._safe_text(run.get('bot_id', '-')[:25]))
+        pdf.cell(30, 5.5, str(len(results)), align='C')
+        status = run.get('status', '-').upper()
+        color = SUCCESS if status == 'DONE' else ERROR if status == 'STOPPED' else GRAY_500
+        pdf.set_text_color(*color)
+        pdf.cell(30, 5.5, status, align='C')
+        pdf.set_text_color(*GRAY_500)
+        pdf.cell(30, 5.5, _fmt_dt(run.get('started_at', '')), align='C', new_x='LMARGIN', new_y='NEXT')
+        pdf.set_draw_color(*GRAY_200)
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+
+    pdf.ln(6)
+
+    # Consolidated metrics
+    _draw_metrics(pdf, main_run, all_results)
+
+    # All test cases
+    _draw_test_cases(pdf, all_results)
+
+    # Summary — reuse the same format as single-run
+    _draw_summary_consolidated(pdf, all_run_data, all_results)
+
+    if "dest" in inspect.signature(pdf.output).parameters:
+        return pdf.output(dest="S").encode("latin-1")
+    buf = io.BytesIO()
+    pdf.output(buf)
+    return buf.getvalue()

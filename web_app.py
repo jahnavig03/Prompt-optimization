@@ -347,7 +347,11 @@ def api_run_tests(uc_id):
                 )
                 if runner._should_stop(run_id):
                     break
+                if runner._should_stop(run_id):
+                    break
                 eq.put({"type": "eval_start", "tc_id": tc_id})
+                if runner._should_stop(run_id):
+                    break
                 ev = runner.evaluate_transcript(result, tc["pass_criteria"], client, model,
                                                   use_case_id=uc_id, test_id=tc_id)
                 eq.put({"type": "test_complete",
@@ -362,8 +366,8 @@ def api_run_tests(uc_id):
             eq.put({"type": "error", "message": str(e)})
         finally:
             final_status = "stopped" if runner._should_stop(run_id) else "done"
-            eq.put({"type": "done", "run_id": run_id})
-            db.update_run(run_id, status=final_status, ended_at="datetime('now')")
+            eq.put({"type": "done", "run_id": run_id, "stopped": final_status == "stopped"})
+            db.update_run(run_id, status=final_status, ended_at=datetime.now().isoformat())
             runner._stop_flags.discard(run_id)
             # ── Auto-update knowledge from simulated run results ──
             _auto_update_knowledge_from_sim_run(run_id, uc_id)
@@ -578,8 +582,10 @@ def api_playwright_run():
         finally:
             _pw_stop_flags.discard(run_id)
             _pw_otp_queues.pop(run_id, None)
-            db.update_playwright_run(run_id, status="done",
-                                     ended_at=datetime.now().isoformat())
+            current = db.get_playwright_run(run_id)
+            if not current or current.get("status") != "stopped":
+                db.update_playwright_run(run_id, status="done",
+                                         ended_at=datetime.now().isoformat())
             # ── Auto-update knowledge: merge PASS results → rebuild rubric ──
             _auto_update_knowledge_from_pw_run(run_id, uc_ids, bot_id)
 
@@ -633,6 +639,12 @@ def api_playwright_stop(run_id):
     _pw_stop_flags.add(run_id)
     db.update_playwright_run(run_id, status="stopped",
                              ended_at=datetime.now().isoformat())
+    eq = _pw_queues.get(run_id)
+    if eq:
+        try:
+            eq.put({"type": "pw_stopping", "run_id": run_id})
+        except Exception:
+            pass
     return jsonify({"ok": True})
 
 
@@ -995,6 +1007,346 @@ app.view_functions["api_delete_acceptance_rule"] = _wrap_with_rebuild(
     _orig_delete_acceptance_rule,
     lambda rule_id: (db.get_acceptance_rule(rule_id) or {}).get("use_case_id"),
 )
+
+
+# ── Custom Testing ───────────────────────────────────────────────────────────
+_custom_queues:     dict[int, queue.Queue] = {}
+_custom_stop_flags: set[int]              = set()
+
+
+@app.route("/custom")
+def custom_page():
+    return render_template("custom.html")
+
+
+@app.route("/api/custom/tests/<int:uc_id>", methods=["GET"])
+def api_custom_tests(uc_id):
+    return jsonify(db.list_custom_tests(uc_id))
+
+
+@app.route("/api/custom/tests/<int:uc_id>", methods=["POST"])
+def api_custom_test_create(uc_id):
+    data = request.get_json() or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name required"}), 400
+    desc = data.get("description", "")
+    steps = data.get("steps", [])
+    existing = db.list_custom_tests(uc_id)
+    next_num = len(existing) + 1
+    test_id = f"CT-{next_num:03d}"
+    row_id = db.add_custom_test(uc_id, test_id, name, desc, steps)
+    return jsonify({"id": row_id, "test_id": test_id})
+
+
+@app.route("/api/custom/tests/<int:uc_id>/generate", methods=["POST"])
+def api_custom_test_generate(uc_id):
+    """Generate test steps from a description using LLM."""
+    creds = _require_key()
+    if not creds:
+        return jsonify({"error": "OpenAI API key not configured."}), 400
+    data = request.get_json() or {}
+    description = (data.get("description") or "").strip()
+    if not description:
+        return jsonify({"error": "description required"}), 400
+
+    uc = db.get_use_case(uc_id)
+    if not uc:
+        return jsonify({"error": "use case not found"}), 404
+
+    api_key, model = creds
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key)
+
+    trigger = uc.get("trigger", "")
+    prompt_text = (uc.get("prompt") or {}).get("content", "")
+
+    system = (
+        "You are a QA engineer generating test steps for a Yellow.ai chatbot.\n"
+        "Given a description of what to test, generate a JSON array of test step objects.\n"
+        "Each step has:\n"
+        '  - "action": either "send" (send a text message) or "click" (click a button)\n'
+        '  - "value": the text to send or button label to click\n'
+        "Return ONLY the JSON array, no markdown fences.\n"
+        "The first step should be the trigger message that starts the conversation."
+    )
+    user_msg = f"Agent trigger: {trigger}\nAgent prompt summary (first 500 chars): {prompt_text[:500]}\n\nTest description:\n{description}"
+    try:
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
+            temperature=0.3,
+        )
+        raw = resp.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+        steps = json.loads(raw)
+        return jsonify({"steps": steps})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/custom/tests/item/<int:test_db_id>", methods=["PATCH"])
+def api_custom_test_update(test_db_id):
+    data = request.get_json() or {}
+    db.update_custom_test(
+        test_db_id,
+        name=data.get("name", ""),
+        description=data.get("description", ""),
+        steps=data.get("steps", []),
+    )
+    return jsonify({"ok": True})
+
+
+@app.route("/api/custom/tests/item/<int:test_db_id>", methods=["DELETE"])
+def api_custom_test_delete(test_db_id):
+    db.delete_custom_test(test_db_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/custom/run", methods=["POST"])
+def api_custom_run():
+    data   = request.get_json() or {}
+    uc_id  = int(data.get("use_case_id", 0))
+    if not uc_id:
+        return jsonify({"error": "use_case_id required"}), 400
+
+    uc = db.get_use_case(uc_id)
+    if not uc:
+        return jsonify({"error": "use case not found"}), 404
+
+    tests = db.list_custom_tests(uc_id)
+    test_ids = data.get("test_ids")
+    if test_ids:
+        tests = [t for t in tests if t["test_id"] in test_ids]
+    if not tests:
+        return jsonify({"error": "No custom tests to run."}), 400
+
+    cfg    = load_config()
+    bot_id = cfg.get("bot_id", "").strip()
+    if not bot_id:
+        return jsonify({"error": "Bot ID not configured."}), 400
+
+    try:
+        import playwright_runner as pw_runner  # noqa
+    except ImportError:
+        return jsonify({"error": "Playwright not installed."}), 500
+
+    run_id = db.create_custom_run(uc_id, bot_id, len(tests))
+    eq     = queue.Queue()
+    _custom_queues[run_id] = eq
+
+    pw_tests = []
+    for t in tests:
+        turns = []
+        for step in t.get("steps", []):
+            action = step.get("action", "send")
+            value = step.get("value", "")
+            if action == "click":
+                turns.append({"user": f"[Click {value}]", "expected": ""})
+            else:
+                turns.append({"user": value, "expected": ""})
+        pw_tests.append({
+            "test_id": t["test_id"],
+            "name": t["name"],
+            "turns": turns,
+            "use_case_id": uc_id,
+            "use_case_name": uc["name"],
+            "pass_criteria": [],
+            "category": "custom",
+        })
+
+    eq.put({"type": "pw_run_start", "run_id": run_id,
+            "total_tests": len(pw_tests), "mode": "headless", "tests": pw_tests})
+
+    def _bg():
+        import sys, traceback
+        try:
+            pw_runner.start_playwright_run(
+                run_id, pw_tests, bot_id, "headless", eq, _custom_stop_flags,
+                client=None, model=None,
+                single_agent_name=uc["name"],
+                skip_evaluation=True,
+            )
+        except BaseException as exc:
+            tb = traceback.format_exc()
+            print(f"[custom._bg] crash run {run_id}: {type(exc).__name__}: {exc}\n{tb}",
+                  flush=True, file=sys.stderr)
+            try:
+                eq.put({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
+                eq.put({"type": "pw_done", "run_id": run_id})
+            except Exception:
+                pass
+        finally:
+            _custom_stop_flags.discard(run_id)
+            current = db.get_custom_run(run_id)
+            if not current or current.get("status") != "stopped":
+                db.update_custom_run(run_id, status="done",
+                                     ended_at=datetime.now().isoformat())
+
+    threading.Thread(target=_bg, daemon=True).start()
+    return jsonify({"run_id": run_id, "total_tests": len(pw_tests), "tests": pw_tests})
+
+
+@app.route("/api/custom/stream/<int:run_id>")
+def api_custom_stream(run_id):
+    def generate():
+        eq = _custom_queues.get(run_id)
+        if not eq:
+            yield f"data: {json.dumps({'type':'error','message':'run not found'})}\n\n"
+            return
+        import queue as Q
+        while True:
+            try:
+                event = eq.get(timeout=90)
+                yield f"data: {json.dumps(event)}\n\n"
+                if event.get("type") == "pw_done":
+                    break
+            except Q.Empty:
+                yield 'data: {"type":"ping"}\n\n'
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.route("/api/custom/stop/<int:run_id>", methods=["POST"])
+def api_custom_stop(run_id):
+    _custom_stop_flags.add(run_id)
+    db.update_custom_run(run_id, status="stopped",
+                         ended_at=datetime.now().isoformat())
+    eq = _custom_queues.get(run_id)
+    if eq:
+        try:
+            eq.put({"type": "pw_stopping", "run_id": run_id})
+        except Exception:
+            pass
+    return jsonify({"ok": True})
+
+
+@app.route("/api/custom/runs", methods=["GET"])
+def api_custom_list_runs():
+    uc_id = request.args.get("use_case_id", type=int)
+    runs = db.list_custom_runs(uc_id)
+    for r in runs:
+        r["results"] = db.get_custom_results(r["id"])
+    return jsonify(runs)
+
+
+@app.route("/api/custom/runs/<int:run_id>", methods=["GET"])
+def api_custom_get_run(run_id):
+    run = db.get_custom_run(run_id)
+    if not run:
+        return jsonify({"error": "not found"}), 404
+    run["results"] = db.get_custom_results(run_id)
+    return jsonify(run)
+
+
+@app.route("/api/custom/runs/<int:run_id>", methods=["DELETE"])
+def api_custom_delete_run(run_id):
+    db.delete_custom_run(run_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/custom/results/<int:result_id>/verdict", methods=["PATCH"])
+def api_custom_result_verdict(result_id):
+    """User manually marks a custom test result as PASS or FAIL."""
+    data = request.get_json() or {}
+    verdict = (data.get("verdict") or "").upper()
+    if verdict not in ("PASS", "FAIL"):
+        return jsonify({"error": "verdict must be PASS or FAIL"}), 400
+    db.update_custom_result(result_id, overall=verdict)
+    with db.db() as conn:
+        row = conn.execute("SELECT run_id FROM custom_results WHERE id = ?", (result_id,)).fetchone()
+        if row:
+            rid = row["run_id"]
+            counts = conn.execute(
+                "SELECT "
+                "SUM(CASE WHEN overall='PASS' THEN 1 ELSE 0 END) as p, "
+                "SUM(CASE WHEN overall='FAIL' THEN 1 ELSE 0 END) as f "
+                "FROM custom_results WHERE run_id = ?", (rid,)
+            ).fetchone()
+            conn.execute("UPDATE custom_runs SET passed = ?, failed = ? WHERE id = ?",
+                         (counts["p"] or 0, counts["f"] or 0, rid))
+    return jsonify({"ok": True})
+
+
+@app.route("/api/custom/save-result", methods=["POST"])
+def api_custom_save_result():
+    """Save a result captured from a custom test run."""
+    data = request.get_json() or {}
+    run_id = data.get("run_id")
+    if not run_id:
+        return jsonify({"error": "run_id required"}), 400
+    result_id = db.save_custom_result(
+        run_id=run_id,
+        use_case_id=data.get("use_case_id", 0),
+        use_case_name=data.get("use_case_name", ""),
+        test_id=data.get("test_id", ""),
+        name=data.get("name", ""),
+        turns=data.get("turns", []),
+        overall=data.get("overall", "pending"),
+        summary=data.get("summary", ""),
+    )
+    return jsonify({"id": result_id})
+
+
+# ── Reporting ────────────────────────────────────────────────────────────────
+
+@app.route("/reporting")
+def reporting_page():
+    return render_template("reporting.html")
+
+
+@app.route("/api/reporting/runs", methods=["GET"])
+def api_reporting_runs():
+    """List all runs (Live Validate + Custom) for reporting."""
+    pw_runs = db.list_playwright_runs(limit=50)
+    for r in pw_runs:
+        r["source"] = "live_validate"
+        r["results"] = db.get_playwright_results(r["id"])
+        uc_ids = r.get("use_case_ids", [])
+        names = []
+        for uid in uc_ids:
+            uc = db.get_use_case(uid)
+            if uc:
+                names.append(uc["name"])
+        r["agent_names"] = names
+
+    custom_runs = db.list_custom_runs(limit=50)
+    for r in custom_runs:
+        r["source"] = "custom"
+        r["results"] = db.get_custom_results(r["id"])
+        uc = db.get_use_case(r.get("use_case_id", 0))
+        r["agent_names"] = [uc["name"]] if uc else []
+
+    all_runs = pw_runs + custom_runs
+    all_runs.sort(key=lambda x: x.get("started_at", ""), reverse=True)
+    return jsonify(all_runs)
+
+
+@app.route("/api/reporting/download", methods=["POST"])
+def api_reporting_download():
+    """Download a PDF report for selected runs (single or consolidated)."""
+    data = request.get_json() or {}
+    run_selections = data.get("runs", [])
+    if not run_selections:
+        return jsonify({"error": "No runs selected."}), 400
+
+    try:
+        pdf_bytes = report_pdf.generate_consolidated_report(run_selections)
+    except Exception as e:
+        return jsonify({"error": f"Report generation failed: {e}"}), 500
+
+    filename = "consolidated_report.pdf" if len(run_selections) > 1 else "test_report.pdf"
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 # ── Frontend ──────────────────────────────────────────────────────────────────

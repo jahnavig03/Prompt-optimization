@@ -586,15 +586,39 @@ async function startRun() {
 
 async function stopRun() {
   if (!currentRunId) return;
-  await api(`/api/playwright/stop/${currentRunId}`, { method: 'POST' });
-  setStatus('Stopped');
-  refreshPastRuns();
+  const btn = document.getElementById('btn-stop');
+  if (btn) { btn.disabled = true; btn.textContent = 'Stopping…'; }
+  setStatus('Stopping — finishing current test…');
+  try {
+    await api(`/api/playwright/stop/${currentRunId}`, { method: 'POST' });
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = '■ Stop Run'; }
+    setStatus('Stop request failed — try again.', true);
+  }
 }
 
-function downloadReport(runId) {
+async function downloadReport(runId) {
   const id = runId || currentRunId;
   if (!id) return;
-  window.open(`/api/playwright/runs/${id}/report`, '_blank');
+  try {
+    const res = await fetch(`/api/playwright/runs/${id}/report`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setStatus(err.error || `Report failed (${res.status})`, true);
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `run_${id}_report.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    setStatus('Report download failed: ' + err.message, true);
+  }
 }
 
 async function deleteRun(runId) {
@@ -612,13 +636,15 @@ async function deleteRun(runId) {
   refreshPastRuns();
 }
 
-function onRunDone() {
+function onRunDone(statusOverride) {
   document.getElementById('btn-run').disabled  = false;
   document.getElementById('btn-stop').classList.add('hidden');
+  const stopBtn = document.getElementById('btn-stop');
+  if (stopBtn) { stopBtn.disabled = false; stopBtn.textContent = '■ Stop Run'; }
   const pass  = Object.values(testState).filter(t => t.overall === 'PASS').length;
   const fail  = Object.values(testState).filter(t => t.overall !== 'PASS' && t.overall !== 'pending').length;
   const total = Object.keys(testState).length;
-  setStatus(`Done — ${pass}/${total} passed`);
+  setStatus(statusOverride || `Done — ${pass}/${total} passed`);
   updateScoreBar(pass, fail, total);
   refreshPastRuns();
 }
@@ -739,8 +765,12 @@ function handleEvent(ev) {
       }
       break;
 
+    case 'pw_stopping':
+      setStatus('Stopping — finishing current test…');
+      break;
+
     case 'pw_done':
-      onRunDone();
+      onRunDone(ev.stopped ? 'Stopped' : null);
       otpWaitingTestId = null;
       document.getElementById('dp-otp-overlay').classList.add('hidden');
       if (currentEs) { currentEs.close(); currentEs = null; }

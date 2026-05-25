@@ -879,7 +879,11 @@ def run_optimization(run_id: int, uc_id: int):
                 )
                 if _should_stop(run_id):
                     break
+                if _should_stop(run_id):
+                    break
                 eq.put({"type": "eval_start", "tc_id": tc_id})
+                if _should_stop(run_id):
+                    break
                 ev = evaluate_transcript(result, tc["pass_criteria"], client, model,
                                           use_case_id=uc_id, test_id=tc_id)
 
@@ -934,7 +938,7 @@ def run_optimization(run_id: int, uc_id: int):
                 db.save_prompt(uc_id, final_prompt, create_version=True, label="optimized")
                 db.update_run(run_id, status="done", ended_at=datetime.now().isoformat(), current_pass=passed)
                 eq.put({"type": "done", "run_id": run_id, "passed": passed, "total": total,
-                        "iterations": n, "final_prompt": final_prompt})
+                        "iterations": n, "final_prompt": final_prompt, "stopped": False})
                 return
 
             if mode == "step" and not _should_stop(run_id):
@@ -958,7 +962,8 @@ def run_optimization(run_id: int, uc_id: int):
         final_status = "stopped" if _should_stop(run_id) else "done"
         db.update_run(run_id, status=final_status, ended_at=datetime.now().isoformat())
         eq.put({"type": "done", "run_id": run_id, "passed": passed,
-                "total": len(tests), "iterations": n, "final_prompt": current_prompt})
+                "total": len(tests), "iterations": n, "final_prompt": current_prompt,
+                "stopped": final_status == "stopped"})
 
     except Exception as e:
         if eq:

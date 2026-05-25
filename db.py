@@ -154,6 +154,41 @@ CREATE TABLE IF NOT EXISTS acceptance_rules (
 
 CREATE INDEX IF NOT EXISTS idx_acceptance_rules_uc
     ON acceptance_rules(use_case_id, active);
+
+CREATE TABLE IF NOT EXISTS custom_tests (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    use_case_id INTEGER NOT NULL REFERENCES use_cases(id) ON DELETE CASCADE,
+    test_id     TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    steps       TEXT NOT NULL DEFAULT '[]',
+    created_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS custom_runs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    use_case_id   INTEGER NOT NULL REFERENCES use_cases(id) ON DELETE CASCADE,
+    status        TEXT NOT NULL DEFAULT 'running',
+    bot_id        TEXT NOT NULL DEFAULT '',
+    total_tests   INTEGER DEFAULT 0,
+    passed        INTEGER DEFAULT 0,
+    failed        INTEGER DEFAULT 0,
+    started_at    TEXT DEFAULT (datetime('now')),
+    ended_at      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS custom_results (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id           INTEGER NOT NULL REFERENCES custom_runs(id) ON DELETE CASCADE,
+    use_case_id      INTEGER,
+    use_case_name    TEXT DEFAULT '',
+    test_id          TEXT NOT NULL,
+    name             TEXT NOT NULL,
+    turns            TEXT NOT NULL DEFAULT '[]',
+    overall          TEXT NOT NULL DEFAULT 'pending',
+    summary          TEXT DEFAULT '',
+    created_at       TEXT DEFAULT (datetime('now'))
+);
 """
 
 @contextmanager
@@ -632,6 +667,139 @@ def get_acceptance_rule(rule_id: int) -> dict | None:
             "SELECT * FROM acceptance_rules WHERE id = ?", (rule_id,)
         ).fetchone()
         return dict(row) if row else None
+
+
+# ── Custom tests ─────────────────────────────────────────────────────────────
+
+def list_custom_tests(uc_id: int) -> list[dict]:
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM custom_tests WHERE use_case_id = ? ORDER BY test_id", (uc_id,)
+        ).fetchall()
+        result = []
+        for r in rows:
+            t = dict(r)
+            t["steps"] = json.loads(t["steps"])
+            result.append(t)
+        return result
+
+
+def save_custom_tests(uc_id: int, tests: list[dict]):
+    with db() as conn:
+        conn.execute("DELETE FROM custom_tests WHERE use_case_id = ?", (uc_id,))
+        for t in tests:
+            conn.execute(
+                "INSERT INTO custom_tests (use_case_id, test_id, name, description, steps) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (uc_id, t["test_id"], t["name"], t.get("description", ""),
+                 json.dumps(t.get("steps", [])))
+            )
+        conn.execute("UPDATE use_cases SET updated_at = datetime('now') WHERE id = ?", (uc_id,))
+
+
+def add_custom_test(uc_id: int, test_id: str, name: str, description: str, steps: list) -> int:
+    with db() as conn:
+        cur = conn.execute(
+            "INSERT INTO custom_tests (use_case_id, test_id, name, description, steps) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (uc_id, test_id, name, description, json.dumps(steps))
+        )
+        return cur.lastrowid
+
+
+def update_custom_test(test_db_id: int, name: str, description: str, steps: list):
+    with db() as conn:
+        conn.execute(
+            "UPDATE custom_tests SET name = ?, description = ?, steps = ? WHERE id = ?",
+            (name, description, json.dumps(steps), test_db_id)
+        )
+
+
+def delete_custom_test(test_db_id: int):
+    with db() as conn:
+        conn.execute("DELETE FROM custom_tests WHERE id = ?", (test_db_id,))
+
+
+# ── Custom runs ──────────────────────────────────────────────────────────────
+
+def create_custom_run(uc_id: int, bot_id: str, total_tests: int) -> int:
+    with db() as conn:
+        cur = conn.execute(
+            "INSERT INTO custom_runs (use_case_id, bot_id, total_tests) VALUES (?, ?, ?)",
+            (uc_id, bot_id, total_tests),
+        )
+        return cur.lastrowid
+
+
+def update_custom_run(run_id: int, **kwargs):
+    if not kwargs:
+        return
+    with db() as conn:
+        sets = ", ".join(f"{k} = ?" for k in kwargs)
+        conn.execute(f"UPDATE custom_runs SET {sets} WHERE id = ?", (*kwargs.values(), run_id))
+
+
+def get_custom_run(run_id: int) -> dict | None:
+    with db() as conn:
+        row = conn.execute("SELECT * FROM custom_runs WHERE id = ?", (run_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def list_custom_runs(uc_id: int | None = None, limit: int = 30) -> list[dict]:
+    with db() as conn:
+        if uc_id:
+            rows = conn.execute(
+                "SELECT * FROM custom_runs WHERE use_case_id = ? ORDER BY id DESC LIMIT ?",
+                (uc_id, limit)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM custom_runs ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def save_custom_result(run_id: int, use_case_id: int, use_case_name: str,
+                       test_id: str, name: str, turns: list,
+                       overall: str, summary: str = "") -> int:
+    with db() as conn:
+        cur = conn.execute(
+            "INSERT INTO custom_results "
+            "(run_id, use_case_id, use_case_name, test_id, name, turns, overall, summary) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (run_id, use_case_id, use_case_name, test_id, name,
+             json.dumps(turns), overall, summary),
+        )
+        return cur.lastrowid
+
+
+def get_custom_results(run_id: int) -> list[dict]:
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM custom_results WHERE run_id = ? ORDER BY id", (run_id,)
+        ).fetchall()
+        result = []
+        for row in rows:
+            r = dict(row)
+            r["turns"] = json.loads(r.get("turns") or "[]")
+            result.append(r)
+        return result
+
+
+def update_custom_result(result_id: int, **kwargs):
+    if not kwargs:
+        return
+    with db() as conn:
+        # JSON-encode turns if present
+        if "turns" in kwargs and isinstance(kwargs["turns"], list):
+            kwargs["turns"] = json.dumps(kwargs["turns"])
+        sets = ", ".join(f"{k} = ?" for k in kwargs)
+        conn.execute(f"UPDATE custom_results SET {sets} WHERE id = ?", (*kwargs.values(), result_id))
+
+
+def delete_custom_run(run_id: int):
+    with db() as conn:
+        conn.execute("DELETE FROM custom_runs WHERE id = ?", (run_id,))
 
 
 def get_acceptance_rules_for_test(uc_id: int, test_id: str | None = None) -> list[dict]:

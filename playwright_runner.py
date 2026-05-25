@@ -1152,7 +1152,8 @@ async def _wait_for_response(page, user_msg: str, start_index: int,
                               on_thinking_start=None,
                               pre_send_texts: set[str] | None = None,
                               is_button_click: bool = False,
-                              is_first_turn: bool = False) -> list[str]:
+                              is_first_turn: bool = False,
+                              stop_check=None) -> list[str]:
     """
     Wait until the bot finishes responding, then return ONLY the bot messages
     for the CURRENT turn.
@@ -1196,22 +1197,26 @@ async def _wait_for_response(page, user_msg: str, start_index: int,
             nt = _norm(t)
             if nt in _pre:
                 return True
-            # Fuzzy: substring containment, prefix match, or high word overlap
+            # Fuzzy: only filter when the new text is a subset of pre-existing
+            # text, prefix-matches, or has very high word overlap.
+            # We intentionally do NOT filter when a pre-existing text is a
+            # substring of the new text (p in nt) — that was too aggressive and
+            # would drop real responses that happen to contain a welcome phrase.
             for p in _pre:
                 if len(p) < 10:
                     continue
-                # Exact substring either direction
-                if p in nt or nt in p:
+                # New text is fully contained in pre-existing text → it's old
+                if nt in p:
                     return True
                 # Prefix match (first 60 chars) — catches re-rendered text
-                if nt[:60] == p[:60]:
+                if len(nt) >= 60 and len(p) >= 60 and nt[:60] == p[:60]:
                     return True
-                # Word overlap — if 80%+ words match, it's the same message
+                # Word overlap — if 90%+ words match, it's the same message
                 nt_words = set(nt.split())
                 p_words = set(p.split())
                 if nt_words and p_words:
                     overlap = len(nt_words & p_words)
-                    if overlap / max(1, min(len(nt_words), len(p_words))) > 0.8:
+                    if overlap / max(1, min(len(nt_words), len(p_words))) > 0.9:
                         return True
             return False
         filtered = [t for t in texts if not _in_pre(t)]
@@ -1238,6 +1243,8 @@ async def _wait_for_response(page, user_msg: str, start_index: int,
         return _filter(all_bot_texts)
 
     while loop.time() < deadline:
+        if stop_check and stop_check():
+            return []
         new_texts = await _capture()
         sig = "||".join(f"{len(t)}:{t[:60]}" for t in new_texts)
         thinking = await _is_bot_thinking(page)
@@ -1574,10 +1581,15 @@ async def _prepare_page_for_test(page, bot_url: str, max_attempts: int = 3):
 
 async def _run_one_test(page, test: dict, eq: queue.Queue,
                         otp_queue: queue.Queue | None,
-                        single_agent_name: str | None) -> tuple[list[dict], str | None]:
+                        single_agent_name: str | None,
+                        run_id: int = 0,
+                        stop_flags: set | None = None) -> tuple[list[dict], str | None]:
     turns_out: list[dict] = []
     scope_violation: str | None = None
     turns = test.get("turns", [])
+
+    def _stopped() -> bool:
+        return bool(stop_flags is not None and run_id in stop_flags)
 
     # Wait until the widget is fully idle so the welcome message and any
     # replayed history have rendered.
@@ -1596,6 +1608,9 @@ async def _run_one_test(page, test: dict, eq: queue.Queue,
     print(f"[pw] welcome exclusion set: {len(welcome_texts)} texts captured")
 
     for i, turn in enumerate(turns):
+        if _stopped():
+            scope_violation = "(stopped by user)"
+            break
         user_msg = turn.get("user", "")
         expected = turn.get("expected", "")
 
@@ -1676,7 +1691,11 @@ async def _run_one_test(page, test: dict, eq: queue.Queue,
             pre_send_texts=pre_send_texts,
             is_button_click=clicked_button,
             is_first_turn=(i == 0),
+            stop_check=_stopped,
         )
+        if _stopped():
+            scope_violation = "(stopped by user)"
+            break
 
         # ── Strip greeting from first turn if it slipped past the filter ─────
         response_texts = _strip_greeting_from_response(response_texts, is_first_turn=(i == 0))
@@ -1766,7 +1785,8 @@ async def _run_session(run_id: int, tests: list, bot_id: str, mode: str,
                        eq: queue.Queue, stop_flags: set, client, model: str,
                        otp_queue: queue.Queue | None = None,
                        single_agent_name: str | None = None,
-                       other_agent_context: dict | None = None):
+                       other_agent_context: dict | None = None,
+                       skip_evaluation: bool = False):
     """
     Launch a browser and run all tests sequentially.
 
@@ -1828,6 +1848,7 @@ async def _run_session(run_id: int, tests: list, bot_id: str, mode: str,
                     turns_result, scope_violation = await _run_one_test(
                         page, test, eq, otp_queue=otp_queue,
                         single_agent_name=single_agent_name,
+                        run_id=run_id, stop_flags=stop_flags,
                     )
                 except Exception as exc:
                     error_msg = str(exc)
@@ -1836,6 +1857,9 @@ async def _run_session(run_id: int, tests: list, bot_id: str, mode: str,
                         await ctx.close()
                     except Exception:
                         pass
+
+                if run_id in stop_flags:
+                    break
 
                 # ── Evaluation ───────────────────────────────────────────────
                 if error_msg is not None:
@@ -1847,6 +1871,12 @@ async def _run_session(run_id: int, tests: list, bot_id: str, mode: str,
                 elif scope_violation:
                     overall = "FAIL"
                     summary = scope_violation
+                    ev = {"overall": overall, "summary": summary,
+                          "turn_verdicts": [], "criteria_results": [],
+                          "behavior_results": []}
+                elif skip_evaluation:
+                    overall = "pending"
+                    summary = ""
                     ev = {"overall": overall, "summary": summary,
                           "turn_verdicts": [], "criteria_results": [],
                           "behavior_results": []}
@@ -1866,23 +1896,33 @@ async def _run_session(run_id: int, tests: list, bot_id: str, mode: str,
 
                 if overall == "PASS":
                     passed += 1
-                else:
+                elif overall != "pending":
                     failed += 1
 
-                db.save_playwright_result(
-                    run_id, uc_id, uc_name, tc_id, test.get("name", ""),
-                    [{"turn": t["turn"], "user": t["user"],
-                      "expected": t["expected"], "actual": t["actual"]}
-                     for t in turns_result],
-                    overall, summary,
-                    turn_verdicts=ev.get("turn_verdicts", []),
-                    criteria_results=ev.get("criteria_results", []),
-                    behavior_results=ev.get("behavior_results", []),
-                    pass_criteria=test.get("pass_criteria", []),
-                    behavior_expectations=test.get("agent_behavior_expectations", []),
-                    category=test.get("category", ""),
-                )
-                db.update_playwright_run(run_id, passed=passed, failed=failed)
+                turns_flat = [{"turn": t["turn"], "user": t["user"],
+                               "expected": t["expected"], "actual": t["actual"]}
+                              for t in turns_result]
+
+                if skip_evaluation:
+                    # Custom tests — save to custom_results table
+                    db.save_custom_result(
+                        run_id, uc_id, uc_name, tc_id, test.get("name", ""),
+                        turns_flat, overall, summary,
+                    )
+                    db.update_custom_run(run_id, passed=passed, failed=failed)
+                else:
+                    db.save_playwright_result(
+                        run_id, uc_id, uc_name, tc_id, test.get("name", ""),
+                        turns_flat,
+                        overall, summary,
+                        turn_verdicts=ev.get("turn_verdicts", []),
+                        criteria_results=ev.get("criteria_results", []),
+                        behavior_results=ev.get("behavior_results", []),
+                        pass_criteria=test.get("pass_criteria", []),
+                        behavior_expectations=test.get("agent_behavior_expectations", []),
+                        category=test.get("category", ""),
+                    )
+                    db.update_playwright_run(run_id, passed=passed, failed=failed)
 
                 eq.put({
                     "type": "pw_test_complete",
@@ -1909,7 +1949,8 @@ def start_playwright_run(run_id: int, tests: list, bot_id: str, mode: str,
                           eq: queue.Queue, stop_flags: set, client, model: str,
                           otp_queue: queue.Queue | None = None,
                           single_agent_name: str | None = None,
-                          other_agent_context: dict | None = None):
+                          other_agent_context: dict | None = None,
+                          skip_evaluation: bool = False):
     """
     Synchronous wrapper — creates a fresh asyncio event loop, runs the
     Playwright session to completion, then puts the pw_done sentinel.
@@ -1922,7 +1963,8 @@ def start_playwright_run(run_id: int, tests: list, bot_id: str, mode: str,
             _run_session(run_id, tests, bot_id, mode, eq, stop_flags, client, model,
                          otp_queue=otp_queue,
                          single_agent_name=single_agent_name,
-                         other_agent_context=other_agent_context)
+                         other_agent_context=other_agent_context,
+                         skip_evaluation=skip_evaluation)
         )
     except BaseException as exc:
         # Catch BaseException so KeyboardInterrupt / CancelledError surface too.
@@ -1939,6 +1981,7 @@ def start_playwright_run(run_id: int, tests: list, bot_id: str, mode: str,
         except Exception:
             pass
         try:
-            eq.put({"type": "pw_done", "run_id": run_id})
+            eq.put({"type": "pw_done", "run_id": run_id,
+                    "stopped": run_id in stop_flags})
         except Exception:
             pass

@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Custom Testing — Prompt Optimization Lab</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --brand:        #2563eb;
+  --brand-light:  #eff6ff;
+  --brand-border: #bfdbfe;
+  --success:      #16a34a;
+  --success-bg:   #f0fdf4;
+  --success-bd:   #bbf7d0;
+  --error:        #dc2626;
+  --error-bg:     #fef2f2;
+  --error-bd:     #fecaca;
+  --warning:      #d97706;
+  --warning-bg:   #fffbeb;
+  --warning-bd:   #fde68a;
+  --purple:       #7c3aed;
+  --purple-bg:    #f5f3ff;
+  --purple-bd:    #ddd6fe;
+  --border:       #e5e7eb;
+  --border-md:    #d1d5db;
+  --text-1:       #111827;
+  --text-2:       #374151;
+  --text-3:       #6b7280;
+  --text-4:       #9ca3af;
+  --surface:      #ffffff;
+  --surface-2:    #f9fafb;
+  --surface-3:    #f3f4f6;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--surface-2); color: var(--text-1); -webkit-font-smoothing: antialiased; }
+.scrollbar-thin::-webkit-scrollbar { width: 4px; height: 4px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 3px; }
+
+.spin { animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.pulse { animation: pulse 1.4s ease infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+.fade-in { animation: fadeIn .18s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:none; } }
+
+.badge { display:inline-flex; align-items:center; padding:2px 7px; border-radius:20px; font-size:10px; font-weight:600; letter-spacing:.02em; }
+.badge-pass    { background:var(--success-bg); color:var(--success);  border:1px solid var(--success-bd); }
+.badge-fail    { background:var(--error-bg);   color:var(--error);    border:1px solid var(--error-bd); }
+.badge-pending { background:var(--surface-3);  color:var(--text-3);   border:1px solid var(--border); }
+.badge-running { background:var(--brand-light);color:var(--brand);    border:1px solid var(--brand-border); }
+
+.dot { width:7px; height:7px; border-radius:50%; display:inline-block; flex-shrink:0; }
+.dot-pass    { background:var(--success); }
+.dot-fail    { background:var(--error); }
+.dot-pending { background:var(--border-md); }
+.dot-running { background:var(--brand); animation:pulse 1s infinite; }
+
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:6px 12px; border-radius:7px; font-size:12px; font-weight:500; cursor:pointer; transition:all .14s; border:1px solid transparent; white-space:nowrap; line-height:1.4; }
+.btn:disabled { opacity:.45; cursor:not-allowed; }
+.btn-primary { background:var(--brand); color:#fff; border-color:var(--brand); }
+.btn-primary:hover:not(:disabled) { background:#1d4ed8; }
+.btn-ghost   { background:var(--surface); color:var(--text-2); border-color:var(--border-md); }
+.btn-ghost:hover:not(:disabled)   { background:var(--surface-2); border-color:#9ca3af; }
+.btn-danger  { background:var(--error-bg); color:var(--error); border-color:var(--error-bd); }
+.btn-danger:hover:not(:disabled)  { background:#fee2e2; }
+.btn-sm { padding:4px 9px; font-size:11px; border-radius:5px; }
+.btn-success { background:var(--success-bg); color:var(--success); border-color:var(--success-bd); }
+.btn-success:hover:not(:disabled) { background:#dcfce7; }
+
+.card { background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+
+.sec-label { font-size:10px; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:.07em; }
+
+.sidebar-section { padding:0 12px; margin-bottom:2px; }
+
+.inner-list { overflow-y: auto; border-radius: 6px; border: 1px solid var(--border); }
+
+.test-row { display:flex; align-items:center; gap:7px; padding:8px 12px; cursor:pointer; font-size:11px; border-bottom:1px solid var(--surface-3); transition:background .1s; }
+.test-row:hover { background:var(--surface-2); }
+.test-row.selected { background:var(--brand-light); border-left:3px solid var(--brand); padding-left:9px; }
+
+.turn-user { background:var(--brand-light); border:1px solid var(--brand-border); border-left:3px solid var(--brand); border-radius:8px; }
+.turn-bot  { background:var(--success-bg);  border:1px solid var(--success-bd);  border-left:3px solid var(--success); border-radius:8px; }
+
+.run-row { display:flex; align-items:center; padding:6px 10px; cursor:pointer; font-size:11px; border-bottom:1px solid var(--surface-3); transition:background .1s; gap:8px; }
+.run-row:hover { background:var(--surface-2); }
+.run-row.active-run { background:var(--brand-light); }
+
+.resize-handle {
+  width: 5px; cursor: col-resize; background: transparent; flex-shrink:0;
+  position: relative; z-index: 10; transition: background .15s;
+}
+.resize-handle:hover, .resize-handle.dragging { background: var(--brand); opacity: 0.3; }
+</style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+<!-- Header (hidden when embedded) -->
+<header id="page-header" class="flex items-center gap-3 px-5 border-b border-gray-200 bg-white shrink-0 shadow-sm" style="height:48px">
+  <div class="flex items-center gap-2 shrink-0">
+    <div class="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold" style="background:var(--brand)">P</div>
+    <span class="font-semibold text-gray-800 text-sm tracking-tight">Prompt Optimization Lab</span>
+  </div>
+  <div class="w-px h-4 bg-gray-200 shrink-0 mx-0.5"></div>
+  <span class="text-xs font-semibold" style="color:var(--purple)">Custom Testing</span>
+  <div class="flex-1"></div>
+  <a href="/" class="btn btn-ghost btn-sm ml-2">&larr; Back to Lab</a>
+</header>
+
+<!-- Layout -->
+<div class="flex flex-1 min-h-0">
+
+<!-- Left panel -->
+<aside id="sidebar" class="shrink-0 border-r border-gray-200 bg-white flex flex-col" style="width:320px;min-width:240px;max-width:500px">
+  <div class="flex-1 overflow-y-auto scrollbar-thin flex flex-col min-h-0">
+
+    <!-- Agent selector -->
+    <div class="sidebar-section" style="padding-top:10px">
+      <div class="flex items-center justify-between mb-1">
+        <span class="sec-label">Select Agent</span>
+      </div>
+      <select id="agent-select" onchange="onAgentChange()" class="w-full text-xs px-2 py-1.5 rounded-md border border-gray-300 bg-white">
+        <option value="">-- Select an agent --</option>
+      </select>
+    </div>
+
+    <!-- Test cases -->
+    <div class="sidebar-section" style="margin-top:10px">
+      <div class="flex items-center justify-between mb-1">
+        <span class="sec-label">Custom Tests</span>
+        <button onclick="showAddTestModal()" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px">+ Add</button>
+      </div>
+      <div id="test-list" class="inner-list scrollbar-thin" style="max-height:250px">
+        <div id="test-empty" class="text-xs text-gray-400 py-5 text-center">Select an agent to manage tests.</div>
+      </div>
+    </div>
+
+    <!-- Past runs -->
+    <div class="sidebar-section" style="margin-top:10px">
+      <div class="flex items-center justify-between mb-1">
+        <span class="sec-label">Past Runs</span>
+      </div>
+      <div id="past-runs" class="inner-list scrollbar-thin" style="max-height:140px">
+        <div class="text-xs text-gray-400 py-3 text-center">No runs yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Run footer -->
+  <div class="shrink-0 border-t border-gray-200 bg-white px-3 py-2.5 flex flex-col gap-1.5">
+    <div id="error-banner" class="hidden text-xs px-2.5 py-1.5 rounded-md font-medium"
+      style="background:var(--error-bg);color:var(--error);border:1px solid var(--error-bd)"></div>
+    <button id="btn-run" onclick="startRun()" class="btn btn-primary w-full" style="font-size:12px;padding:8px 12px" disabled>
+      &#9654;&nbsp; Run Custom Tests
+    </button>
+    <button id="btn-stop" onclick="stopRun()" class="hidden btn btn-danger btn-sm w-full">
+      &#9632;&nbsp; Stop Run
+    </button>
+    <p id="run-status" class="text-xs text-center text-gray-400" style="min-height:14px;font-size:10px"></p>
+  </div>
+</aside>
+
+<!-- Resize handle -->
+<div id="resize-handle" class="resize-handle"></div>
+
+<!-- Main results panel -->
+<main class="flex flex-1 min-h-0">
+
+  <!-- Results list -->
+  <div id="result-list-panel" class="shrink-0 border-r border-gray-200 bg-white flex flex-col" style="width:360px;min-width:240px">
+    <div class="px-3 py-2.5 border-b border-gray-100 shrink-0 flex items-center justify-between">
+      <span class="sec-label">Results</span>
+      <span id="list-count" class="text-xs text-gray-400" style="font-size:10px"></span>
+    </div>
+    <div id="result-list" class="flex-1 overflow-y-auto scrollbar-thin">
+      <div id="results-empty" class="text-xs text-gray-400 text-center py-12 px-4" style="line-height:1.8">
+        Run custom tests to see results here.
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail pane -->
+  <div class="flex-1 overflow-y-auto scrollbar-thin bg-white">
+    <div id="detail-empty" class="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
+      <div class="text-3xl">&#129302;</div>
+      <p class="text-xs">Click a result to see conversation details.</p>
+    </div>
+
+    <div id="detail-pane" class="hidden p-5 max-w-3xl mx-auto fade-in">
+      <div class="flex items-center gap-3 mb-4">
+        <div id="dp-dot" class="dot dot-pending" style="width:9px;height:9px"></div>
+        <div class="flex-1 min-w-0">
+          <p id="dp-name" class="font-semibold text-gray-900 text-sm truncate"></p>
+          <p id="dp-ucname" class="text-xs text-gray-400 mt-0.5"></p>
+        </div>
+        <span id="dp-badge" class="badge badge-pending">pending</span>
+      </div>
+
+      <!-- Verdict buttons -->
+      <div id="verdict-bar" class="flex items-center gap-2 mb-4 p-2 rounded-lg" style="background:var(--surface-3)">
+        <span class="text-xs font-medium text-gray-500 mr-1">Mark as:</span>
+        <button onclick="markVerdict('PASS')" class="btn btn-success btn-sm">&#10004; Pass</button>
+        <button onclick="markVerdict('FAIL')" class="btn btn-danger btn-sm">&#10006; Fail</button>
+      </div>
+
+      <!-- Conversation turns -->
+      <div class="mb-4">
+        <p class="sec-label mb-2">Conversation</p>
+        <div id="dp-turns" class="space-y-2"></div>
+        <div id="dp-turns-empty" class="text-xs text-gray-400 py-3 text-center">Waiting for turns&hellip;</div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- Add Test Modal -->
+<div id="add-test-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,.35)">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-semibold text-gray-800 text-sm">Add Custom Test</h3>
+      <button onclick="closeAddTestModal()" class="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+    </div>
+
+    <div class="space-y-3">
+      <div>
+        <label class="text-xs font-medium text-gray-500 block mb-1">Test Name</label>
+        <input id="new-test-name" type="text" placeholder="e.g. Cancellation happy path" class="w-full text-xs px-2.5 py-1.5 rounded-md border border-gray-300 bg-white focus:outline-none focus:border-blue-400"/>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-500 block mb-1">Description (optional — used to auto-generate steps)</label>
+        <textarea id="new-test-desc" rows="3" placeholder="e.g. User wants to cancel subscription, provides email, confirms cancellation" class="w-full text-xs px-2.5 py-1.5 rounded-md border border-gray-300 bg-white focus:outline-none focus:border-blue-400" style="resize:vertical"></textarea>
+      </div>
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <label class="text-xs font-medium text-gray-500">Steps</label>
+          <div class="flex gap-1">
+            <button onclick="generateSteps()" id="btn-gen-steps" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px">&#9889; Generate from description</button>
+            <button onclick="addStepRow()" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px">+ Add step</button>
+          </div>
+        </div>
+        <div id="steps-container" class="space-y-1.5 max-h-48 overflow-y-auto scrollbar-thin">
+          <!-- Step rows will be added here -->
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2 mt-4">
+      <button onclick="closeAddTestModal()" class="btn btn-ghost btn-sm">Cancel</button>
+      <button onclick="saveNewTest()" class="btn btn-primary btn-sm">Save Test</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const IS_EMBEDDED = new URLSearchParams(window.location.search).get('embedded') === '1';
+if (IS_EMBEDDED) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const hdr = document.getElementById('page-header');
+    if (hdr) hdr.style.display = 'none';
+  });
+}
+
+let useCases = [];
+let selectedUcId = null;
+let customTests = [];
+let currentRunId = null;
+let currentEs = null;
+let resultState = {};
+let selectedResultId = null;
+
+// Resize
+(function initResize() {
+  const handle = document.getElementById('resize-handle');
+  const sidebar = document.getElementById('sidebar');
+  let dragging = false, startX, startW;
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault(); dragging = true; startX = e.clientX; startW = sidebar.offsetWidth;
+    handle.classList.add('dragging'); document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', e => { if (!dragging) return; sidebar.style.width = Math.min(500, Math.max(240, startW + (e.clientX - startX))) + 'px'; });
+  document.addEventListener('mouseup', () => { if (!dragging) return; dragging = false; handle.classList.remove('dragging'); document.body.style.cursor = ''; document.body.style.userSelect = ''; });
+})();
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  return r.json();
+}
+
+function setStatus(msg, isError = false) {
+  document.getElementById('run-status').textContent = isError ? '' : msg;
+  const banner = document.getElementById('error-banner');
+  if (isError) { banner.textContent = msg; banner.classList.remove('hidden'); }
+  else { banner.classList.add('hidden'); }
+}
+
+function fmtTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  const ucs = await api('/api/playwright/use-cases');
+  useCases = ucs;
+  const sel = document.getElementById('agent-select');
+  ucs.forEach(u => {
+    const opt = document.createElement('option');
+    opt.value = u.id; opt.textContent = u.name;
+    sel.appendChild(opt);
+  });
+}
+
+async function onAgentChange() {
+  const sel = document.getElementById('agent-select');
+  selectedUcId = sel.value ? parseInt(sel.value) : null;
+  document.getElementById('btn-run').disabled = !selectedUcId;
+  if (selectedUcId) {
+    await refreshTests();
+    await refreshPastRuns();
+  } else {
+    document.getElementById('test-list').innerHTML = '<div class="text-xs text-gray-400 py-5 text-center">Select an agent to manage tests.</div>';
+  }
+}
+
+// ── Tests CRUD ────────────────────────────────────────────────────────────────
+async function refreshTests() {
+  if (!selectedUcId) return;
+  customTests = await api(`/api/custom/tests/${selectedUcId}`);
+  const list = document.getElementById('test-list');
+  if (!customTests.length) {
+    list.innerHTML = '<div class="text-xs text-gray-400 py-5 text-center">No custom tests yet. Click <strong>+ Add</strong> to create one.</div>';
+    return;
+  }
+  list.innerHTML = customTests.map(t => `
+    <div class="test-row" onclick="editTest(${t.id})">
+      <div class="flex-1 min-w-0">
+        <div class="font-medium text-gray-800 truncate">${esc(t.test_id)} — ${esc(t.name)}</div>
+        <div class="text-gray-400 mt-0.5" style="font-size:10px">${t.steps.length} step${t.steps.length !== 1 ? 's' : ''}</div>
+      </div>
+      <button onclick="event.stopPropagation();deleteTest(${t.id})" class="text-gray-300 hover:text-red-500 text-xs" title="Delete">&times;</button>
+    </div>
+  `).join('');
+}
+
+function showAddTestModal() {
+  if (!selectedUcId) { setStatus('Select an agent first', true); return; }
+  document.getElementById('new-test-name').value = '';
+  document.getElementById('new-test-desc').value = '';
+  document.getElementById('steps-container').innerHTML = '';
+  delete document.getElementById('add-test-modal').dataset.editId;
+  addStepRow();
+  document.getElementById('add-test-modal').classList.remove('hidden');
+}
+
+function closeAddTestModal() {
+  document.getElementById('add-test-modal').classList.add('hidden');
+}
+
+function addStepRow(action = 'send', value = '') {
+  const container = document.getElementById('steps-container');
+  const row = document.createElement('div');
+  row.className = 'flex items-center gap-1.5';
+  row.innerHTML = `
+    <select class="step-action text-xs px-1.5 py-1 rounded border border-gray-200 bg-white" style="width:70px">
+      <option value="send" ${action === 'send' ? 'selected' : ''}>Send</option>
+      <option value="click" ${action === 'click' ? 'selected' : ''}>Click</option>
+    </select>
+    <input type="text" class="step-value flex-1 text-xs px-2 py-1 rounded border border-gray-200 bg-white" placeholder="Message text or button label" value="${esc(value)}"/>
+    <button onclick="this.parentElement.remove()" class="text-gray-300 hover:text-red-500 text-sm shrink-0">&times;</button>
+  `;
+  container.appendChild(row);
+}
+
+async function generateSteps() {
+  const desc = document.getElementById('new-test-desc').value.trim();
+  if (!desc) { alert('Enter a description first.'); return; }
+  const btn = document.getElementById('btn-gen-steps');
+  btn.disabled = true; btn.textContent = 'Generating...';
+  try {
+    const res = await api(`/api/custom/tests/${selectedUcId}/generate`, {
+      method: 'POST', body: JSON.stringify({ description: desc })
+    });
+    if (res.error) { alert(res.error); return; }
+    const container = document.getElementById('steps-container');
+    container.innerHTML = '';
+    (res.steps || []).forEach(s => addStepRow(s.action || 'send', s.value || ''));
+  } catch (e) { alert('Generation failed: ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = '⚡ Generate from description'; }
+}
+
+function getStepsFromModal() {
+  const rows = document.querySelectorAll('#steps-container > div');
+  const steps = [];
+  rows.forEach(row => {
+    const action = row.querySelector('.step-action').value;
+    const value = row.querySelector('.step-value').value.trim();
+    if (value) steps.push({ action, value });
+  });
+  return steps;
+}
+
+async function saveNewTest() {
+  const name = document.getElementById('new-test-name').value.trim();
+  if (!name) { alert('Test name is required.'); return; }
+  const desc = document.getElementById('new-test-desc').value.trim();
+  const steps = getStepsFromModal();
+  if (!steps.length) { alert('At least one step is required.'); return; }
+  await api(`/api/custom/tests/${selectedUcId}`, {
+    method: 'POST', body: JSON.stringify({ name, description: desc, steps })
+  });
+  closeAddTestModal();
+  await refreshTests();
+}
+
+async function editTest(dbId) {
+  const t = customTests.find(x => x.id === dbId);
+  if (!t) return;
+  document.getElementById('new-test-name').value = t.name;
+  document.getElementById('new-test-desc').value = t.description || '';
+  const container = document.getElementById('steps-container');
+  container.innerHTML = '';
+  (t.steps || []).forEach(s => addStepRow(s.action || 'send', s.value || ''));
+  // Change save button to update
+  document.getElementById('add-test-modal').classList.remove('hidden');
+  // We'll handle edit vs create by checking if editing
+  document.getElementById('add-test-modal').dataset.editId = dbId;
+}
+
+async function deleteTest(dbId) {
+  if (!confirm('Delete this test?')) return;
+  await api(`/api/custom/tests/item/${dbId}`, { method: 'DELETE' });
+  await refreshTests();
+}
+
+// ── Run ───────────────────────────────────────────────────────────────────────
+async function startRun() {
+  if (!selectedUcId) return;
+  if (!customTests.length) { setStatus('No custom tests to run', true); return; }
+
+  setStatus('Starting run...');
+  document.getElementById('btn-run').classList.add('hidden');
+  document.getElementById('btn-stop').classList.remove('hidden');
+  resultState = {};
+
+  try {
+    const res = await api('/api/custom/run', {
+      method: 'POST', body: JSON.stringify({ use_case_id: selectedUcId })
+    });
+    if (res.error) { setStatus(res.error, true); resetRunUI(); return; }
+    currentRunId = res.run_id;
+
+    // Init result state
+    (res.tests || []).forEach(t => {
+      resultState[t.test_id] = {
+        test_id: t.test_id, name: t.name, use_case_name: t.use_case_name || '',
+        overall: 'pending', turns: [], summary: '', db_id: null
+      };
+    });
+    renderResultList();
+
+    // SSE stream
+    currentEs = new EventSource(`/api/custom/stream/${currentRunId}`);
+    currentEs.onmessage = (ev) => {
+      const d = JSON.parse(ev.data);
+      handleEvent(d);
+    };
+    currentEs.onerror = () => {
+      if (currentEs) currentEs.close();
+      currentEs = null;
+    };
+  } catch (e) {
+    setStatus('Failed to start: ' + e.message, true);
+    resetRunUI();
+  }
+}
+
+function handleEvent(d) {
+  const t = d.type;
+  if (t === 'pw_test_start') {
+    const s = resultState[d.test_id];
+    if (s) { s.overall = 'running'; }
+    setStatus(`Running ${d.test_id}: ${d.name || ''}`);
+    renderResultList();
+  }
+  else if (t === 'pw_turn_user') {
+    const s = resultState[d.test_id];
+    if (s) {
+      // Add a new turn with user message, actual will be filled by pw_turn_bot
+      const existing = s.turns.find(tr => tr.turn === d.turn);
+      if (!existing) {
+        s.turns.push({ turn: d.turn, user: d.message || '', expected: '', actual: '...' });
+      }
+    }
+    if (selectedResultId === d.test_id) showResultDetail(d.test_id);
+    renderResultList();
+  }
+  else if (t === 'pw_turn_bot') {
+    const s = resultState[d.test_id];
+    if (s) {
+      const existing = s.turns.find(tr => tr.turn === d.turn);
+      if (existing) {
+        existing.actual = d.message || '(no response)';
+      } else {
+        s.turns.push({ turn: d.turn, user: '', expected: '', actual: d.message || '' });
+      }
+    }
+    if (selectedResultId === d.test_id) showResultDetail(d.test_id);
+    renderResultList();
+  }
+  else if (t === 'pw_test_complete') {
+    const s = resultState[d.test_id];
+    if (s) {
+      s.overall = d.overall || 'pending';
+      s.summary = d.summary || '';
+      s.turns = d.turns || s.turns;
+    }
+    renderResultList();
+    if (selectedResultId === d.test_id) showResultDetail(d.test_id);
+  }
+  else if (t === 'pw_done' || t === 'done') {
+    if (currentEs) currentEs.close();
+    currentEs = null;
+    setStatus('Run complete.');
+    resetRunUI();
+    refreshPastRuns();
+  }
+  else if (t === 'error') {
+    setStatus(d.message || 'Unknown error', true);
+  }
+}
+
+async function stopRun() {
+  if (!currentRunId) return;
+  await api(`/api/custom/stop/${currentRunId}`, { method: 'POST' });
+  setStatus('Stopped.');
+  resetRunUI();
+  refreshPastRuns();
+}
+
+function resetRunUI() {
+  document.getElementById('btn-run').classList.remove('hidden');
+  document.getElementById('btn-stop').classList.add('hidden');
+}
+
+// ── Result list ───────────────────────────────────────────────────────────────
+function renderResultList() {
+  const list = document.getElementById('result-list');
+  const ids = Object.keys(resultState);
+  if (!ids.length) {
+    list.innerHTML = '<div class="text-xs text-gray-400 text-center py-12 px-4">Run custom tests to see results here.</div>';
+    document.getElementById('list-count').textContent = '';
+    return;
+  }
+
+  const passed = ids.filter(id => resultState[id].overall === 'PASS').length;
+  const failed = ids.filter(id => resultState[id].overall === 'FAIL').length;
+  document.getElementById('list-count').textContent = `${passed}P / ${failed}F / ${ids.length} total`;
+
+  list.innerHTML = ids.map(id => {
+    const s = resultState[id];
+    const dotClass = s.overall === 'PASS' ? 'dot-pass' : s.overall === 'FAIL' ? 'dot-fail' : s.overall === 'running' ? 'dot-running' : 'dot-pending';
+    const sel = selectedResultId === id ? 'selected' : '';
+    return `<div class="test-row ${sel}" onclick="showResultDetail('${esc(id)}')">
+      <div class="dot ${dotClass}"></div>
+      <div class="flex-1 min-w-0">
+        <div class="font-medium text-gray-800 truncate">${esc(s.test_id)} — ${esc(s.name)}</div>
+        <div class="text-gray-400" style="font-size:10px">${s.turns.length} turns</div>
+      </div>
+      <span class="badge badge-${s.overall === 'PASS' ? 'pass' : s.overall === 'FAIL' ? 'fail' : s.overall === 'running' ? 'running' : 'pending'}">${s.overall}</span>
+    </div>`;
+  }).join('');
+}
+
+function showResultDetail(tcId) {
+  selectedResultId = tcId;
+  renderResultList();
+  const s = resultState[tcId];
+  if (!s) return;
+
+  document.getElementById('detail-empty').classList.add('hidden');
+  document.getElementById('detail-pane').classList.remove('hidden');
+  document.getElementById('dp-name').textContent = `${s.test_id} — ${s.name}`;
+  document.getElementById('dp-ucname').textContent = s.use_case_name || '';
+
+  const dotEl = document.getElementById('dp-dot');
+  dotEl.className = 'dot ' + (s.overall === 'PASS' ? 'dot-pass' : s.overall === 'FAIL' ? 'dot-fail' : s.overall === 'running' ? 'dot-running' : 'dot-pending');
+  dotEl.style.width = '9px'; dotEl.style.height = '9px';
+
+  const badge = document.getElementById('dp-badge');
+  badge.className = 'badge badge-' + (s.overall === 'PASS' ? 'pass' : s.overall === 'FAIL' ? 'fail' : s.overall === 'running' ? 'running' : 'pending');
+  badge.textContent = s.overall;
+
+  // Verdict bar
+  const vbar = document.getElementById('verdict-bar');
+  vbar.classList.toggle('hidden', s.overall === 'running');
+
+  // Turns
+  const turnsEl = document.getElementById('dp-turns');
+  const emptyEl = document.getElementById('dp-turns-empty');
+  if (!s.turns.length) {
+    turnsEl.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+  } else {
+    emptyEl.classList.add('hidden');
+    turnsEl.innerHTML = s.turns.map(t => `
+      <div class="turn-user px-3 py-2">
+        <div class="flex items-center gap-1.5 mb-1">
+          <span class="text-xs font-semibold" style="color:var(--brand)">Turn ${t.turn} &mdash; User</span>
+        </div>
+        <p class="text-xs text-gray-800 whitespace-pre-wrap">${esc(t.user)}</p>
+      </div>
+      <div class="turn-bot px-3 py-2">
+        <div class="flex items-center gap-1.5 mb-1">
+          <span class="text-xs font-semibold" style="color:var(--success)">Bot</span>
+        </div>
+        <p class="text-xs text-gray-800 whitespace-pre-wrap">${esc(t.actual || '(no response captured)')}</p>
+      </div>
+    `).join('');
+  }
+}
+
+async function markVerdict(verdict) {
+  if (!selectedResultId) return;
+  const s = resultState[selectedResultId];
+  if (!s || !s.db_id) {
+    // Find the db_id from the current run results
+    if (currentRunId) {
+      const run = await api(`/api/custom/runs/${currentRunId}`);
+      const match = (run.results || []).find(r => r.test_id === selectedResultId);
+      if (match) s.db_id = match.id;
+    }
+  }
+  if (!s || !s.db_id) { setStatus('Result not saved yet.', true); return; }
+
+  await api(`/api/custom/results/${s.db_id}/verdict`, {
+    method: 'PATCH', body: JSON.stringify({ verdict })
+  });
+  s.overall = verdict;
+  renderResultList();
+  showResultDetail(selectedResultId);
+}
+
+// ── Past runs ─────────────────────────────────────────────────────────────────
+async function refreshPastRuns() {
+  if (!selectedUcId) return;
+  const runs = await api(`/api/custom/runs?use_case_id=${selectedUcId}`);
+  const container = document.getElementById('past-runs');
+  if (!runs.length) {
+    container.innerHTML = '<div class="text-xs text-gray-400 py-3 text-center">No runs yet.</div>';
+    return;
+  }
+  container.innerHTML = runs.map(r => {
+    const status = r.status || 'done';
+    const dotClass = status === 'running' ? 'dot-running' : status === 'done' ? 'dot-pass' : 'dot-fail';
+    return `<div class="run-row" onclick="loadPastRun(${r.id})">
+      <div class="dot ${dotClass}"></div>
+      <div class="flex-1 min-w-0">
+        <div class="text-xs font-medium text-gray-700">Run #${r.id}</div>
+        <div class="text-gray-400" style="font-size:10px">${fmtTime(r.started_at)} &middot; ${r.passed || 0}P / ${r.failed || 0}F / ${r.total_tests || 0}</div>
+      </div>
+      <button onclick="event.stopPropagation();deleteRun(${r.id})" class="text-gray-300 hover:text-red-500 text-xs" title="Delete">&times;</button>
+    </div>`;
+  }).join('');
+}
+
+async function loadPastRun(runId) {
+  const run = await api(`/api/custom/runs/${runId}`);
+  if (!run || run.error) return;
+  currentRunId = runId;
+  resultState = {};
+  (run.results || []).forEach(r => {
+    resultState[r.test_id] = {
+      test_id: r.test_id, name: r.name, use_case_name: r.use_case_name || '',
+      overall: r.overall, turns: r.turns || [], summary: r.summary || '',
+      db_id: r.id
+    };
+  });
+  renderResultList();
+  selectedResultId = null;
+  document.getElementById('detail-empty').classList.remove('hidden');
+  document.getElementById('detail-pane').classList.add('hidden');
+}
+
+async function deleteRun(runId) {
+  if (!confirm('Delete this run?')) return;
+  await api(`/api/custom/runs/${runId}`, { method: 'DELETE' });
+  refreshPastRuns();
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Override save to handle edit vs create
+const _origSaveNewTest = saveNewTest;
+window.saveNewTest = async function() {
+  const modal = document.getElementById('add-test-modal');
+  const editId = modal.dataset.editId;
+  const name = document.getElementById('new-test-name').value.trim();
+  if (!name) { alert('Test name is required.'); return; }
+  const desc = document.getElementById('new-test-desc').value.trim();
+  const steps = getStepsFromModal();
+  if (!steps.length) { alert('At least one step is required.'); return; }
+
+  if (editId) {
+    await api(`/api/custom/tests/item/${editId}`, {
+      method: 'PATCH', body: JSON.stringify({ name, description: desc, steps })
+    });
+    delete modal.dataset.editId;
+  } else {
+    await api(`/api/custom/tests/${selectedUcId}`, {
+      method: 'POST', body: JSON.stringify({ name, description: desc, steps })
+    });
+  }
+  closeAddTestModal();
+  await refreshTests();
+};
+
+init();
+</script>
+</body>
+</html>
